@@ -460,15 +460,67 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
         root = etree.parse(xml_fp).getroot()
         sample = root.getchildren()[0]
         metadata = {}
+
         attributes = sample.find('SAMPLE_ATTRIBUTES')
         for node in attributes.iterfind('SAMPLE_ATTRIBUTE'):
             tag = node.getchildren()[0]
             value = node.getchildren()[1]
             if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'Not provided'
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
             else:
                 metadata[tag.text.strip('" ').upper()] \
                     = value.text.strip('" ')
+
+        #adding loops to look for additional data
+        title= sample.find('TITLE')
+        if title.text is None:
+            metadata['title'] = 'not provided'
+        else:
+            metadata['title'] = title.text.strip('" ')
+        description = sample.find('DESCRIPTION')
+        try:
+            if description.text is None:
+                metadata['description'] = 'not provided'
+            else:
+                if sep in description.text:
+                    split_desc=description.text.strip('" ').split(sep)
+                    counter=0
+                    for i in split_desc:
+                        metadata['description_field_' + str(counter)] = i
+                        counter += 1
+                else:
+                    metadata['description'] = description.text.strip('" ')
+        except:
+            metadata['description'] = 'not provided'
+
+        nameInfo = sample.find('SAMPLE_NAME')
+        for node in nameInfo:
+            tag = node.tag
+            value = node.text
+            if value is None:
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
+            else:
+                metadata[tag.strip('" ').upper()] = value.strip('" ')
+
+        idInfo = sample.find('IDENTIFIERS')
+        for node in idInfo:
+            value = node.text
+            d = node.attrib
+            if len(d) > 0:
+                for k in d.keys():
+                    tag = node.tag + "_" + d[k]
+                    if value is None:
+                        metadata[tag.text.strip('" ').upper()] = 'not provided'
+                    else:
+                        metadata[tag.strip('" ').upper()] = value.strip('" ')
+            else:
+                tag = node.tag
+
+                if value is None:
+                    metadata[tag.text.strip('" ').upper()] = 'not provided'
+                else:
+                    metadata[tag.strip('" ').upper()] = value.strip('" ')
+
         return metadata
 
     logger.info("downloading sample.txt file for each sample")
@@ -476,7 +528,10 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
     for row in details_df.iterrows():
         library_name = row[1][0]
         current_path = "./" + study_accession + "/" + library_name
+
         sample_accession = row[1][1]
+        if sample_accession == 'unspecified': # and not DEBUG:
+            raise Exception(sample_accession + " does not contain metadata")
         if path.exists(current_path + "/" + sample_accession + ".txt"):
             continue
 
@@ -568,10 +623,61 @@ def sra_create_sample_file(sample_file, study_accession, study_details):
             tag = node.getchildren()[0]
             value = node.getchildren()[1]
             if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'Not provided'
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
             else:
                 metadata[tag.text.strip('" ').upper()] \
                     = value.text.strip('" ')
+					
+		#adding loops to look for additional data
+        title= sample.find('TITLE')
+        if title.text is None:
+            metadata['title'] = 'not provided'
+        else:
+            metadata['title'] = title.text.strip('" ')
+        description = sample.find('DESCRIPTION')
+        try:
+            if description.text is None:
+                metadata['description'] = 'not provided'
+            else:
+                if sep in description.text:
+                    split_desc=description.text.strip('" ').split(sep)
+                    counter=0
+                    for i in split_desc:
+                        metadata['description_field_' + str(counter)] = i
+                        counter += 1
+                else:
+                    metadata['description'] = description.text.strip('" ')
+        except:
+            metadata['description'] = 'not provided'
+
+        nameInfo = sample.find('SAMPLE_NAME')
+        for node in nameInfo:
+            tag = node.tag
+            value = node.text
+            if value is None:
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
+            else:
+                metadata[tag.strip('" ').upper()] = value.strip('" ')
+
+        idInfo = sample.find('IDENTIFIERS')
+        for node in idInfo:
+            value = node.text
+            d = node.attrib
+            if len(d) > 0:
+                for k in d.keys():
+                    tag = node.tag + "_" + d[k]
+                    if value is None:
+                        metadata[tag.text.strip('" ').upper()] = 'not provided'
+                    else:
+                        metadata[tag.strip('" ').upper()] = value.strip('" ')
+            else:
+                tag = node.tag
+
+                if value is None:
+                    metadata[tag.text.strip('" ').upper()] = 'not provided'
+                else:
+                    metadata[tag.strip('" ').upper()] = value.strip('" ')
+
         return metadata
 
     logger.info("downloading sample.txt file for each sample")
@@ -762,6 +868,7 @@ if __name__ == '__main__':
                         "all type of sequence samples")
     parser.add_argument("-all-platforms", "--all_platforms", action='store_true', help="Accept " +
                         "all platform samples")
+    parser.add_argument("-sep","--sep",help="separator for description, default is ';' ")
     args = parser.parse_args()
 
     if args.ebiaccession is None and args.sraaccession is None:
@@ -775,12 +882,13 @@ if __name__ == '__main__':
                     files for the entered SRA accession, and download the
                     FASTQ files.
                 Optional flags:
-                    -sample [sample_file_name]
-                    -prep [prep_file_name]
-                    -study [study_info_file_name]
+                    -sample_info [sample_info_file_name]
+                    -prep_info [prep_info_file_name]
+                    -study_info [study_info_file_name]
                     -debug
                     -all-seqs
                     -all-platforms
+                    -sep
                """)
         sys.exit(2)
 
@@ -796,6 +904,9 @@ if __name__ == '__main__':
             if args.prep_fileName is None else args.prep_fileName
         study_file_name = args.ebiaccession + "_study_info.txt" \
             if args.study_fileName is None else args.study_fileName
+
+        #set parser settings
+        sep= ';' if args.sep is None else args.sep
         # Call create_details_file to generate .details.txt
         study_details = ebi_create_details_file(args.ebiaccession)
 
