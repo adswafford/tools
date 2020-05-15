@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# conda command to install all dependencies:
-#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools xmltodict lxml -c bioconda -c conda-forge -y
 #
 # pip command to install all dependencies:
 #   pip install csv glob requests subprocess xmltodict sys lxml os urllib
@@ -13,8 +11,8 @@
 #       -sample {name} flag allows the user to specify the sample file name
 #       -prep {name} flag allows the user to specify the prep file name
 #       -study {name} flag allows the user to specify the study info file name
-#       -all-seqs allows the script to accept all sample types
-#       -all-platforms allows the script to accept samples from all platforms
+#       -all-seqs true flag allows the script to accept all sample types
+#       -all-platform true flag allows the script to accept samples from all platforms
 #       -debug true flag to enter debug mode (not download fastq files)
 #
 # libraries used
@@ -33,7 +31,7 @@ from pandas import read_csv, DataFrame
 
 DEBUG = False
 ALL_SEQS = False
-ALL_PLATFORMS = False
+ALL_PLATFORM = False
 handler = logging.StreamHandler()
 fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
 handler.setFormatter(logging.Formatter(fmt_str))
@@ -84,14 +82,14 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
             continue
         row_list = row.decode("utf-8").split('\t')
         if not ALL_SEQS and row_list[5].upper() != "METAGENOMIC":
-            logger.warning("Library source is " + row_list[5] +
-                            " not Metagenomic for " +
+            logger.warning(row_list[5])
+            logger.warning("Library source is not Metagenomic for " +
                            row_list[1] + ". Omitting " + row_list[1])
             continue
             # skip row
-        elif not ALL_PLATFORMS and row_list[6].lower() != "illumina":
-            logger.warning("Instrument platform is " + row_list[6] + 
-                            " not Illumina for " +
+        elif not ALL_PLATFORM and row_list[6].lower() != "illumina":
+            logger.warning(row_list[6])
+            logger.warning("Instrument platform is not Illumina for " +
                            row_list[1] + ". Omitting " + row_list[1])
             continue
             # skip row
@@ -99,7 +97,7 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
             for i in range(len(row_list)):
                 if len(row_list[i]) == 0:
                     row_list[i] = "unspecified"
-            if ALL_PLATFORMS:
+            if ALL_PLATFORM:
                 row_string = '\t'.join(row_list)
             else:
                 row_string = '\t'.join(row_list[:6]) + "\tIllumina\t" + \
@@ -113,7 +111,7 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
         if ALL_SEQS:
             raise Exception(study_accession + " has no sample or run that" +
                             " is from Illumina")
-        elif ALL_PLATFORMS:
+        elif ALL_PLATFORM:
             raise Exception(study_accession + " has no sample or run that" +
                             " is METAGENOMIC")
         else:
@@ -196,20 +194,17 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
             if not ALL_SEQS:
                 if line[indices['library_source']].upper() != "METAGENOMIC":
                     logger.warning(line[indices['library_source']])
-                    logger.warning("Library source is " +
-                                    line[indices['library_source']] +
-                                    " not Metagenomic for " +
+                    logger.warning("Library source is not Metagenomic for " +
                                    line[indices['run_accession']] +
                                    ". Omitting " +
                                    line[indices['run_accession']])
                     continue
-            elif not ALL_PLATFORMS:
+            elif not ALL_PLATFORM:
                 if line[indices['instrument_platform']].lower() != "illumina":
-                    logger.warning("Instrument platform is " + 
-                                    line[indices['instrument_platform']] +
-                                    " not Illumina for " +
-                                    line[indices['run_accession']] + ". Omitting "
-                                    + line[indices['run_accession']])
+                    logger.warning(line[indices['instrument_platform']])
+                    logger.warning("Instrument platform is not Illumina for for "
+                                   + line[indices['run_accession']] + ". Omitting "
+                                   + line[indices['run_accession']])
                     continue
 
             for key in indices:
@@ -223,7 +218,7 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
         if ALL_SEQS:
             raise Exception(study_accession + " has no sample or run that" +
                             " is from Illumina")
-        elif ALL_PLATFORMS:
+        elif ALL_PLATFORM:
             raise Exception(study_accession + " has no sample or run that" +
                             " is METAGENOMIC")
         else:
@@ -756,11 +751,11 @@ if __name__ == '__main__':
                         "transcriptional),instrument_platform")
     parser.add_argument("-study", "--study_fileName", help="Study_file" +
                         " that contains study information")
-    parser.add_argument("-debug", "--debug", action='store_true', help="Debug mode: don't " +
+    parser.add_argument("-debug", "--debug", help="Debug mode: don't " +
                         "download fastq files")
-    parser.add_argument("-all-seqs", "--all_seqs", action='store_true', help="Accept " +
+    parser.add_argument("-all-seqs", "--all_seqs", help="Accept " +
                         "all type of sequence samples")
-    parser.add_argument("-all-platforms", "--all_platforms", action='store_true', help="Accept " +
+    parser.add_argument("-all-platform", "--all_platform", help="Accept " +
                         "all platform samples")
     args = parser.parse_args()
 
@@ -778,15 +773,15 @@ if __name__ == '__main__':
                     -sample [sample_file_name]
                     -prep [prep_file_name]
                     -study [study_info_file_name]
-                    -debug
-                    -all-seqs
-                    -all-platforms
+                    -debug true
+                    -all-seqs true
+                    -all-platform true
                """)
         sys.exit(2)
 
-    DEBUG = args.debug
-    ALL_SEQS = args.all_seqs
-    ALL_PLATFORMS = args.all_platforms
+    DEBUG = True if args.debug == "true" else False
+    ALL_SEQS = True if args.all_seqs == "true" else False
+    ALL_PLATFORM = True if args.all_platform == "true" else False
 
     if args.ebiaccession is not None:
         # Output file names
@@ -826,7 +821,7 @@ if __name__ == '__main__':
             if args.prep_fileName is None else args.prep_fileName
         study_file_name = args.sraaccession + "_study_info.txt" \
             if args.study_fileName is None else args.study_fileName
-        # Call create_details_file to generate .details.txt
+        # Call create_details_file to generate .details.tx
         study_details = sra_create_details_file(args.sraaccession)
         # Call create_info_file to generate feed.xml file and study_info file
         sra_create_info_file(study_file_name, args.sraaccession)
