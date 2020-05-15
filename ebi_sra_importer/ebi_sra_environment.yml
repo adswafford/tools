@@ -1,0 +1,12 @@
+name: ebi_sra_importer
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - xmltodict
+  - pandas
+  - entrez-direct
+  - sra-tools
+  - lxml
+  - requests
+
