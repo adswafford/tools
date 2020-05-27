@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# conda command to install all dependencies:
+#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools xmltodict lxml -c bioconda -c conda-forge -y
 #
 # pip command to install all dependencies:
 #   pip install csv glob requests subprocess xmltodict sys lxml os urllib
@@ -11,8 +13,8 @@
 #       -sample {name} flag allows the user to specify the sample file name
 #       -prep {name} flag allows the user to specify the prep file name
 #       -study {name} flag allows the user to specify the study info file name
-#       -all-seqs true flag allows the script to accept all sample types
-#       -all-platform true flag allows the script to accept samples from all platforms
+#       -all-seqs allows the script to accept all sample types
+#       -all-platforms allows the script to accept samples from all platforms
 #       -debug true flag to enter debug mode (not download fastq files)
 #
 # libraries used
@@ -31,7 +33,7 @@ from pandas import read_csv, DataFrame
 
 DEBUG = False
 ALL_SEQS = False
-ALL_PLATFORM = False
+ALL_PLATFORMS = False
 handler = logging.StreamHandler()
 fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
 handler.setFormatter(logging.Formatter(fmt_str))
@@ -82,14 +84,14 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
             continue
         row_list = row.decode("utf-8").split('\t')
         if not ALL_SEQS and row_list[5].upper() != "METAGENOMIC":
-            logger.warning(row_list[5])
-            logger.warning("Library source is not Metagenomic for " +
+            logger.warning("Library source is " + row_list[5] +
+                            " not Metagenomic for " +
                            row_list[1] + ". Omitting " + row_list[1])
             continue
             # skip row
-        elif not ALL_PLATFORM and row_list[6].lower() != "illumina":
-            logger.warning(row_list[6])
-            logger.warning("Instrument platform is not Illumina for " +
+        elif not ALL_PLATFORMS and row_list[6].lower() != "illumina":
+            logger.warning("Instrument platform is " + row_list[6] + 
+                            " not Illumina for " +
                            row_list[1] + ". Omitting " + row_list[1])
             continue
             # skip row
@@ -97,7 +99,7 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
             for i in range(len(row_list)):
                 if len(row_list[i]) == 0:
                     row_list[i] = "unspecified"
-            if ALL_PLATFORM:
+            if ALL_PLATFORMS:
                 row_string = '\t'.join(row_list)
             else:
                 row_string = '\t'.join(row_list[:6]) + "\tIllumina\t" + \
@@ -111,7 +113,7 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
         if ALL_SEQS:
             raise Exception(study_accession + " has no sample or run that" +
                             " is from Illumina")
-        elif ALL_PLATFORM:
+        elif ALL_PLATFORMS:
             raise Exception(study_accession + " has no sample or run that" +
                             " is METAGENOMIC")
         else:
@@ -194,17 +196,20 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
             if not ALL_SEQS:
                 if line[indices['library_source']].upper() != "METAGENOMIC":
                     logger.warning(line[indices['library_source']])
-                    logger.warning("Library source is not Metagenomic for " +
+                    logger.warning("Library source is " +
+                                    line[indices['library_source']] +
+                                    " not Metagenomic for " +
                                    line[indices['run_accession']] +
                                    ". Omitting " +
                                    line[indices['run_accession']])
                     continue
-            elif not ALL_PLATFORM:
+            elif not ALL_PLATFORMS:
                 if line[indices['instrument_platform']].lower() != "illumina":
-                    logger.warning(line[indices['instrument_platform']])
-                    logger.warning("Instrument platform is not Illumina for for "
-                                   + line[indices['run_accession']] + ". Omitting "
-                                   + line[indices['run_accession']])
+                    logger.warning("Instrument platform is " + 
+                                    line[indices['instrument_platform']] +
+                                    " not Illumina for " +
+                                    line[indices['run_accession']] + ". Omitting "
+                                    + line[indices['run_accession']])
                     continue
 
             for key in indices:
@@ -218,7 +223,7 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
         if ALL_SEQS:
             raise Exception(study_accession + " has no sample or run that" +
                             " is from Illumina")
-        elif ALL_PLATFORM:
+        elif ALL_PLATFORMS:
             raise Exception(study_accession + " has no sample or run that" +
                             " is METAGENOMIC")
         else:
@@ -267,6 +272,7 @@ def ebi_create_info_file(study_file, study_accession, xmlFile='feed.xml'):
     # Creating a dummy xml to dump the output
     with open(xmlFile, 'wb') as file:
         file.write(response.content)
+
     with open(xmlFile) as fd:
         doc = parse(fd.read())
 
@@ -455,23 +461,78 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
         root = etree.parse(xml_fp).getroot()
         sample = root.getchildren()[0]
         metadata = {}
+
         attributes = sample.find('SAMPLE_ATTRIBUTES')
         for node in attributes.iterfind('SAMPLE_ATTRIBUTE'):
             tag = node.getchildren()[0]
             value = node.getchildren()[1]
             if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'Not provided'
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
             else:
                 metadata[tag.text.strip('" ').upper()] \
                     = value.text.strip('" ')
+
+        #adding loops to look for additional data
+        title= sample.find('TITLE')
+        if title.text is None:
+            metadata['title'] = 'not provided'
+        else:
+            metadata['title'] = title.text.strip('" ')
+        description = sample.find('DESCRIPTION')
+        try:
+            if description.text is None:
+                metadata['description'] = 'not provided'
+            else:
+                if sep in description.text:
+                    split_desc=description.text.strip('" ').split(sep)
+                    counter=0
+                    for i in split_desc:
+                        metadata['description_field_' + str(counter)] = i
+                        counter += 1
+                else:
+                    metadata['description'] = description.text.strip('" ')
+        except:
+            metadata['description'] = 'not provided'
+
+        nameInfo = sample.find('SAMPLE_NAME')
+        for node in nameInfo:
+            tag = node.tag
+            value = node.text
+            if value is None:
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
+            else:
+                metadata[tag.strip('" ').upper()] = value.strip('" ')
+
+        idInfo = sample.find('IDENTIFIERS')
+        for node in idInfo:
+            value = node.text
+            d = node.attrib
+            if len(d) > 0:
+                for k in d.keys():
+                    tag = node.tag + "_" + d[k]
+                    if value is None:
+                        metadata[tag.text.strip('" ').upper()] = 'not provided'
+                    else:
+                        metadata[tag.strip('" ').upper()] = value.strip('" ')
+            else:
+                tag = node.tag
+
+                if value is None:
+                    metadata[tag.text.strip('" ').upper()] = 'not provided'
+                else:
+                    metadata[tag.strip('" ').upper()] = value.strip('" ')
+
         return metadata
 
     logger.info("downloading sample.txt file for each sample")
     details_df = read_csv(study_details, sep='\t', header=None)
     for row in details_df.iterrows():
         library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + library_name
+        current_path = "./" + study_accession + "/" + str(library_name)
+
         sample_accession = row[1][1]
+        if sample_accession == 'unspecified': # and not DEBUG:
+            raise Exception(sample_accession + " does not contain metadata")
         if path.exists(current_path + "/" + sample_accession + ".txt"):
             continue
 
@@ -507,8 +568,8 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
         else:
             all_samp.append(parsed)
 
-    all_samp = DataFrame(all_samp, dtype=str).fillna('Not provided')
-    all_samp_exp = DataFrame(all_samp_exp, dtype=str).fillna('Not provided')
+    all_samp = DataFrame(all_samp, dtype=str).fillna('not provided')
+    all_samp_exp = DataFrame(all_samp_exp, dtype=str).fillna('not provided')
 
     result = (all_samp, all_samp_exp)
 
@@ -519,14 +580,15 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
         values = [val+["EBI"] for val in values]
         listitem = [header] + values
         newlist.append(listitem)
-    # C ontains header names
+    # Contains header names
     header = newlist[0][0]
     final = []
     # The column names should not involve these characters
     # TODO: Construct a more exclusive list
     for i in header:
         temp = str(i).lower().replace(" ", "_").replace("-", "_")\
-            .replace("(", "").replace(")", "").replace("/", "")
+            .replace("(", "_").replace(")", "_").replace("/", "per")\
+            .replace("-","_").replace("|","_")
         final.append(temp)
     final.append("public_import_source")
     newlist[0][0] = final
@@ -671,10 +733,13 @@ def ebi_fetch_data_file(study_accession, study_details):
     for row in details_df.iterrows():
         submitted_format = row[1][7]
         library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + library_name
+        current_path = "./" + study_accession + "/" + str(library_name)
         sample_accession = row[1][1]
+        print(sample_accession)
         run_accession = row[1][2]
+        print(run_accession)
         fastq_ftp = row[1][4]
+        print(fastq_ftp)
         if type(row[1][4]) is not str:
             logger.warning("No fastq ftp found for sample: " + sample_accession
                            + ", run: " + run_accession)
@@ -686,29 +751,42 @@ def ebi_fetch_data_file(study_accession, study_details):
             makedirs(current_path)
 
         fastq_ftp = fastq_ftp.split(';')
+        print(fastq_ftp)
         if isinstance(submitted_format, str):
             submitted_format = submitted_format.split(';')
         else:
             submitted_format = None
+
+        print(submitted_format)
+
         for i in range(len(fastq_ftp)):
-            # Check for the format(sff or fastq)
+             # Check for the format(sff or fastq)
             fq_path = current_path + "/" + sample_accession + "." + \
                 run_accession + "_R"
-            if len(fastq_ftp) > 1:
-                fq_path = fq_path + str(i + 1)
+            
+            #catching strange ebi three-read issue
+            if len(fastq_ftp) == 3 and i == 0:
+                fq_path = fq_path + str(i)
+            #ensure that R always gets at least a 1
+            else:
+                fq_path = fq_path + str(i+1)
+
             if submitted_format is None and ".sff" in fastq_ftp[i]:
                 fq_path = fq_path + ".sff"
             elif submitted_format is None and ".fastq.gz" in fastq_ftp[i]:
                 fq_path = fq_path + ".fastq.gz"
-            elif len(submitted_format) < i and submitted_format[i] == "SFF":
+            elif len(submitted_format) < i and submitted_format == "SFF":
                 fq_path = fq_path + ".sff"
             else:
                 fq_path = fq_path + ".fastq.gz"
+
             if path.isfile(fq_path):
                 logger.warning("Skipping " + fq_path)
                 logger.warning("File exists")
                 continue
             urlretrieve("ftp://" + fastq_ftp[i], fq_path)
+
+
 
 
 def sra_fetch_data_file(study_details):
@@ -751,12 +829,13 @@ if __name__ == '__main__':
                         "transcriptional),instrument_platform")
     parser.add_argument("-study", "--study_fileName", help="Study_file" +
                         " that contains study information")
-    parser.add_argument("-debug", "--debug", help="Debug mode: don't " +
+    parser.add_argument("-debug", "--debug", action='store_true', help="Debug mode: don't " +
                         "download fastq files")
-    parser.add_argument("-all-seqs", "--all_seqs", help="Accept " +
+    parser.add_argument("-all-seqs", "--all_seqs", action='store_true', help="Accept " +
                         "all type of sequence samples")
-    parser.add_argument("-all-platform", "--all_platform", help="Accept " +
+    parser.add_argument("-all-platforms", "--all_platforms", action='store_true', help="Accept " +
                         "all platform samples")
+    parser.add_argument("-sep","--sep",help="separator for description, default is ';' ")
     args = parser.parse_args()
 
     if args.ebiaccession is None and args.sraaccession is None:
@@ -770,18 +849,19 @@ if __name__ == '__main__':
                     files for the entered SRA accession, and download the
                     FASTQ files.
                 Optional flags:
-                    -sample [sample_file_name]
-                    -prep [prep_file_name]
-                    -study [study_info_file_name]
-                    -debug true
-                    -all-seqs true
-                    -all-platform true
+                    -sample_info [sample_info_file_name]
+                    -prep_info [prep_info_file_name]
+                    -study_info [study_info_file_name]
+                    -debug
+                    -all-seqs
+                    -all-platforms
+                    -sep
                """)
         sys.exit(2)
 
-    DEBUG = True if args.debug == "true" else False
-    ALL_SEQS = True if args.all_seqs == "true" else False
-    ALL_PLATFORM = True if args.all_platform == "true" else False
+    DEBUG = args.debug
+    ALL_SEQS = args.all_seqs
+    ALL_PLATFORMS = args.all_platforms
 
     if args.ebiaccession is not None:
         # Output file names
@@ -791,6 +871,9 @@ if __name__ == '__main__':
             if args.prep_fileName is None else args.prep_fileName
         study_file_name = args.ebiaccession + "_study_info.txt" \
             if args.study_fileName is None else args.study_fileName
+
+        #set parser settings
+        sep= ';' if args.sep is None else args.sep
         # Call create_details_file to generate .details.txt
         study_details = ebi_create_details_file(args.ebiaccession)
 
@@ -821,7 +904,7 @@ if __name__ == '__main__':
             if args.prep_fileName is None else args.prep_fileName
         study_file_name = args.sraaccession + "_study_info.txt" \
             if args.study_fileName is None else args.study_fileName
-        # Call create_details_file to generate .details.tx
+        # Call create_details_file to generate .details.txt
         study_details = sra_create_details_file(args.sraaccession)
         # Call create_info_file to generate feed.xml file and study_info file
         sra_create_info_file(study_file_name, args.sraaccession)
