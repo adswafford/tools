@@ -529,7 +529,6 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
     for row in details_df.iterrows():
         library_name = row[1][0]
         current_path = "./" + study_accession + "/" + str(library_name)
-
         sample_accession = row[1][1]
         if sample_accession == 'unspecified': # and not DEBUG:
             raise Exception(sample_accession + " does not contain metadata")
@@ -625,10 +624,61 @@ def sra_create_sample_file(sample_file, study_accession, study_details):
             tag = node.getchildren()[0]
             value = node.getchildren()[1]
             if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'Not provided'
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
             else:
                 metadata[tag.text.strip('" ').upper()] \
                     = value.text.strip('" ')
+					
+		#adding loops to look for additional data
+        title= sample.find('TITLE')
+        if title.text is None:
+            metadata['title'] = 'not provided'
+        else:
+            metadata['title'] = title.text.strip('" ')
+        description = sample.find('DESCRIPTION')
+        try:
+            if description.text is None:
+                metadata['description'] = 'not provided'
+            else:
+                if sep in description.text:
+                    split_desc=description.text.strip('" ').split(sep)
+                    counter=0
+                    for i in split_desc:
+                        metadata['description_field_' + str(counter)] = i
+                        counter += 1
+                else:
+                    metadata['description'] = description.text.strip('" ')
+        except:
+            metadata['description'] = 'not provided'
+
+        nameInfo = sample.find('SAMPLE_NAME')
+        for node in nameInfo:
+            tag = node.tag
+            value = node.text
+            if value is None:
+                metadata[tag.text.strip('" ').upper()] = 'not provided'
+            else:
+                metadata[tag.strip('" ').upper()] = value.strip('" ')
+
+        idInfo = sample.find('IDENTIFIERS')
+        for node in idInfo:
+            value = node.text
+            d = node.attrib
+            if len(d) > 0:
+                for k in d.keys():
+                    tag = node.tag + "_" + d[k]
+                    if value is None:
+                        metadata[tag.text.strip('" ').upper()] = 'not provided'
+                    else:
+                        metadata[tag.strip('" ').upper()] = value.strip('" ')
+            else:
+                tag = node.tag
+
+                if value is None:
+                    metadata[tag.text.strip('" ').upper()] = 'not provided'
+                else:
+                    metadata[tag.strip('" ').upper()] = value.strip('" ')
+
         return metadata
 
     logger.info("downloading sample.txt file for each sample")
