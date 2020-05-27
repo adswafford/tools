@@ -272,6 +272,7 @@ def ebi_create_info_file(study_file, study_accession, xmlFile='feed.xml'):
     # Creating a dummy xml to dump the output
     with open(xmlFile, 'wb') as file:
         file.write(response.content)
+
     with open(xmlFile) as fd:
         doc = parse(fd.read())
 
@@ -527,8 +528,7 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
     details_df = read_csv(study_details, sep='\t', header=None)
     for row in details_df.iterrows():
         library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + library_name
-
+        current_path = "./" + study_accession + "/" + str(library_name)
         sample_accession = row[1][1]
         if sample_accession == 'unspecified': # and not DEBUG:
             raise Exception(sample_accession + " does not contain metadata")
@@ -567,8 +567,8 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
         else:
             all_samp.append(parsed)
 
-    all_samp = DataFrame(all_samp, dtype=str).fillna('Not provided')
-    all_samp_exp = DataFrame(all_samp_exp, dtype=str).fillna('Not provided')
+    all_samp = DataFrame(all_samp, dtype=str).fillna('not provided')
+    all_samp_exp = DataFrame(all_samp_exp, dtype=str).fillna('not provided')
 
     result = (all_samp, all_samp_exp)
 
@@ -579,14 +579,15 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
         values = [val+["EBI"] for val in values]
         listitem = [header] + values
         newlist.append(listitem)
-    # C ontains header names
+    # Contains header names
     header = newlist[0][0]
     final = []
     # The column names should not involve these characters
     # TODO: Construct a more exclusive list
     for i in header:
         temp = str(i).lower().replace(" ", "_").replace("-", "_")\
-            .replace("(", "").replace(")", "").replace("/", "")
+            .replace("(", "_").replace(")", "_").replace("/", "per")\
+            .replace("-","_").replace("|","_")
         final.append(temp)
     final.append("public_import_source")
     newlist[0][0] = final
@@ -782,10 +783,13 @@ def ebi_fetch_data_file(study_accession, study_details):
     for row in details_df.iterrows():
         submitted_format = row[1][7]
         library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + library_name
+        current_path = "./" + study_accession + "/" + str(library_name)
         sample_accession = row[1][1]
+        print(sample_accession)
         run_accession = row[1][2]
+        print(run_accession)
         fastq_ftp = row[1][4]
+        print(fastq_ftp)
         if type(row[1][4]) is not str:
             logger.warning("No fastq ftp found for sample: " + sample_accession
                            + ", run: " + run_accession)
@@ -797,29 +801,42 @@ def ebi_fetch_data_file(study_accession, study_details):
             makedirs(current_path)
 
         fastq_ftp = fastq_ftp.split(';')
+        print(fastq_ftp)
         if isinstance(submitted_format, str):
             submitted_format = submitted_format.split(';')
         else:
             submitted_format = None
+
+        print(submitted_format)
+
         for i in range(len(fastq_ftp)):
-            # Check for the format(sff or fastq)
+             # Check for the format(sff or fastq)
             fq_path = current_path + "/" + sample_accession + "." + \
                 run_accession + "_R"
-            if len(fastq_ftp) > 1:
-                fq_path = fq_path + str(i + 1)
+            
+            #catching strange ebi three-read issue
+            if len(fastq_ftp) == 3 and i == 0:
+                fq_path = fq_path + str(i)
+            #ensure that R always gets at least a 1
+            else:
+                fq_path = fq_path + str(i+1)
+
             if submitted_format is None and ".sff" in fastq_ftp[i]:
                 fq_path = fq_path + ".sff"
             elif submitted_format is None and ".fastq.gz" in fastq_ftp[i]:
                 fq_path = fq_path + ".fastq.gz"
-            elif len(submitted_format) < i and submitted_format[i] == "SFF":
+            elif len(submitted_format) < i and submitted_format == "SFF":
                 fq_path = fq_path + ".sff"
             else:
                 fq_path = fq_path + ".fastq.gz"
+
             if path.isfile(fq_path):
                 logger.warning("Skipping " + fq_path)
                 logger.warning("File exists")
                 continue
             urlretrieve("ftp://" + fastq_ftp[i], fq_path)
+
+
 
 
 def sra_fetch_data_file(study_details):
