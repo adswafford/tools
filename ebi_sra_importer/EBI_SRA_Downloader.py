@@ -90,7 +90,7 @@ def ebi_create_details_file(study_accession, file_suffix="_detail"):
             continue
             # skip row
         elif not ALL_PLATFORMS and row_list[6].lower() != "illumina":
-            logger.warning("Instrument platform is " + row_list[6] + 
+            logger.warning("platform is " + row_list[6] + 
                             " not Illumina for " +
                            row_list[1] + ". Omitting " + row_list[1])
             continue
@@ -166,7 +166,7 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
         'experiment_accession': -1,
         'download_path': -1,
         'library_source': -1,
-        'instrument_platform': -1,
+        'platform': -1,
         'submitted_format': -1,
         'library_strategy': -1,
         'library_layout': -1
@@ -185,7 +185,7 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
             indices['experiment_accession'] = header.index('Experiment')
             indices['download_path'] = header.index('download_path')
             indices['library_source'] = header.index('LibrarySource')
-            indices['instrument_platform'] = header.index('Platform')
+            indices['platform'] = header.index('Platform')
             indices['library_strategy'] = header.index('LibraryStrategy')
             indices['library_layout'] = header.index('LibraryLayout')
             isHeader = False
@@ -204,9 +204,9 @@ def sra_create_details_file(study_accession, file_suffix="_detail"):
                                    line[indices['run_accession']])
                     continue
             elif not ALL_PLATFORMS:
-                if line[indices['instrument_platform']].lower() != "illumina":
-                    logger.warning("Instrument platform is " + 
-                                    line[indices['instrument_platform']] +
+                if line[indices['platform']].lower() != "illumina":
+                    logger.warning("Platform is " + 
+                                    line[indices['platform']] +
                                     " not Illumina for " +
                                     line[indices['run_accession']] + ". Omitting "
                                     + line[indices['run_accession']])
@@ -384,7 +384,7 @@ def create_prep_file(prep_file, study_details):
         temp_library_strategy + prep_file[prep_file.rfind("."):]
     file = open(prep_file_name, "w")
     file.write("sample_name" + "\t" + "run_prefix" + "\t"
-               + "experiment_accession" + "\t" + "instrument_platform" + "\t"
+               + "experiment_accession" + "\t" + "platform" + "\t"
                + "library_strategy" + "\t" + "library_source" + "\t"
                + "library_layout" + "\n")
     file.close()
@@ -400,7 +400,7 @@ def create_prep_file(prep_file, study_details):
                 temp_library_strategy + prep_file[prep_file.rfind("."):]
             file = open(prep_file_name, "w")
             file.write("sample_name" + "\t" + "run_prefix" + "\t"
-                       + "experiment_accession" + "\t" + "instrument_platform"
+                       + "experiment_accession" + "\t" + "platform"
                        + "\t" + "library_strategy" + "\t" + "library_source"
                        + "\t" + "library_layout" + "\n")
             file.close()
@@ -420,7 +420,7 @@ def create_prep_file(prep_file, study_details):
                 f1 = open(next_prep_file, "w")
                 f1.write("sample_name" + "\t" + "run_prefix" + "\t"
                          + "experiment_accession" + "\t"
-                         + "instrument_platform" + "\t"
+                         + "platform" + "\t"
                          + "library_strategy" + "\t"
                          + "library_source" + "\t"
                          + "library_layout" + "\n")
@@ -529,6 +529,7 @@ def ebi_create_sample_file(sample_file, study_accession, study_details):
     for row in details_df.iterrows():
         library_name = row[1][0]
         current_path = "./" + study_accession + "/" + str(library_name)
+
         sample_accession = row[1][1]
         if sample_accession == 'unspecified': # and not DEBUG:
             raise Exception(sample_accession + " does not contain metadata")
@@ -624,13 +625,14 @@ def sra_create_sample_file(sample_file, study_accession, study_details):
             tag = node.getchildren()[0]
             value = node.getchildren()[1]
             if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'not provided'
+                metadata[tag.text.strip('" ').upper()] = 'Not provided'
             else:
                 metadata[tag.text.strip('" ').upper()] \
                     = value.text.strip('" ')
-					
-		#adding loops to look for additional data
+
+         #adding loops to look for additional data
         title= sample.find('TITLE')
+        
         if title.text is None:
             metadata['title'] = 'not provided'
         else:
@@ -674,6 +676,24 @@ def sra_create_sample_file(sample_file, study_accession, study_details):
             else:
                 tag = node.tag
 
+                if value is None:
+                    metadata[tag.text.strip('" ').upper()] = 'not provided'
+                else:
+                    metadata[tag.strip('" ').upper()] = value.strip('" ')
+
+        poolInfo = sample.find('Pool')
+        for node in poolInfo:
+            value = node.text
+            d = node.attrib
+            if len(d) > 0:
+                for k in d.keys():
+                    tag = node.tag + "_" + d[k]
+                    if value is None:
+                        metadata[tag.text.strip('" ').upper()] = 'not provided'
+                    else:
+                        metadata[tag.strip('" ').upper()] = value.strip('" ')
+            else:
+                tag = node.tag
                 if value is None:
                     metadata[tag.text.strip('" ').upper()] = 'not provided'
                 else:
@@ -876,7 +896,7 @@ if __name__ == '__main__':
     parser.add_argument("-prep", "--prep_fileName", help="prep_fileName" +
                         " that contains info like: sample-name,prefix of" +
                         " fastqs/sffs,library-source(metagenomic/genomic/" +
-                        "transcriptional),instrument_platform")
+                        "transcriptional),platform")
     parser.add_argument("-study", "--study_fileName", help="Study_file" +
                         " that contains study information")
     parser.add_argument("-debug", "--debug", action='store_true', help="Debug mode: don't " +
