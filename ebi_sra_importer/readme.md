@@ -1,4 +1,4 @@
-First start by creating a conda environment with the needed packages:  
+__First start by creating a conda environment with the needed packages:__  
 conda create -name ebi-sra-importer -c bioconda xmltodict lxml pandas requests sra-tools entrez-direct
 
 Then source activate ebi-sra-importer
