@@ -29,18 +29,17 @@ __Available flags:__
  optional flag for user to customize study info file name  
  e.g. python3 EBI_SRA_Downloader.py -ebi [ebiaccession_number] -study [study_info_file_name]
 
- -all-seqs true  
+ -all-seqs
  optional flag for user to filter out non-metagenomic samples  
  without setting the flag, the non-metagenomic samples will be filtered out  
  e.g. python3 EBI_SRA_Downloader.py -ebi [ebiaccession_number] -all-seqs true
 
- -all-platform true  
+ -all-platforms  
  optional flag for user to filter out non-illumina samples  
  without setting the flag, the non-illumina samples will be filtered out  
- e.g. python3 EBI_SRA_Downloader.py -ebi [ebiaccession_number] -all-platform true
+ e.g. python3 EBI_SRA_Downloader.py -ebi [ebiaccession_number] -all-platforms 
 
-
- -debug true  
+ -debug 
  optional flag for developer to enter debug mode  
  debug mode is simply for developer to debug, which will not download massive size data files  
  e.g. python3 EBI_SRA_Downloader.py -ebi [ebiaccession_number] -debug true
@@ -61,7 +60,7 @@ __Generated files after running the script:__
  [accession_number]_prep_info.txt  
  	The information about each run in each sample in the study.  
  	The following information is listed in this file (in order):  
- 		sample_name, run_prefix, instrument_platform, library_strategy, library_source, library_layout  
+ 		sample_name, run_prefix, platform, library_strategy, library_source, library_layout  
  	run_prefix is made up by [sample accession].[run accession].
 
  [accession_number]_sample_info.txt  
