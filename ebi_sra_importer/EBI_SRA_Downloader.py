@@ -229,7 +229,7 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
         
         for index, row in input_df.iterrows():
             sample_accession = row[identifier]
-            prep_type = row['library_source']
+            prep_type = row['library_strategy']
             if prep_type not in sample_count_dict.keys() :
                 sample_count_dict[prep_type]= {sample_accession:0}
             elif sample_accession not in sample_count_dict[prep_type].keys():
@@ -406,7 +406,10 @@ def create_details_file(study_details_df, study_accession,mode='ebi',prefix='',f
     return study_details
     
 def write_info_files(final_df,prefix=''):
-    prep_info_columns = ['run_prefix','experiment_accession','platform','instrument_model','library_strategy','library_source','library_layout','library_selection','fastq_ftp']
+    prep_info_columns = ['run_prefix','experiment_accession','platform','instrument_model','library_strategy',
+                         'library_source','library_layout','library_selection','fastq_ftp','ena_checklist',
+                         'ena_spot_count','ena_base_count','ena_first_public','ena_last_update','instrument_platform',
+                         'submitted_format','sequencing_method']
     final_df.columns =[scrub_special_chars(col).lower() for col in final_df.columns]
     if DEBUG: logger.info(final_df.columns)
     #write sample_info
