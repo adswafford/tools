@@ -331,9 +331,9 @@ def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
                             if 'max' in r.keys():
                                 max_value = r['max']
                             if 'min_exclusive' in r.keys():
-                                min_value = r['min']
+                                min_value = r['min_exclusive']
                             if 'max_exclusive' in r.keys():
-                                max_value = r['max']
+                                max_value = r['max_exclusive']
                 elif validator_yaml[k]['type'] in validator_yaml[k].keys():
                     if validator_yaml[k]['type']== 'string':
                         allowed_list=validator_yaml[k]['allowed']
