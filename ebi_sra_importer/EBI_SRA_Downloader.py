@@ -470,6 +470,14 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
 if __name__ == '__main__':
     # parse the flags and initialize output file names
     # TODO:Reword help info
+    
+    #set up logging
+    handler = logging.StreamHandler()
+    fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+    handler.setFormatter(logging.Formatter(fmt_str))
+    logger = logging.getLogger(__name__)
+    logger.addHandler(handler)
+        
     parser = ArgumentParser(description='Please note that the following ' +
                             'packages have to be installed for running this ' +
                             'script: 1)lxml 2)pandas 3)glob 4)csv 5)sys ' +
@@ -516,6 +524,7 @@ if __name__ == '__main__':
                     --strategy [list of one or more library strategies to select]
                     --sources [list of one or more library sources to select]
                     --platforms [list of one or more sequencing platforms to select]
+                    --scientific_names [list of one or more scientific names to select]
                     --validators [list of one or more yaml files to use in validating]
                     --no_seqs [skip downloading files]
                     --verbose          
@@ -528,12 +537,7 @@ if __name__ == '__main__':
         omit_seqs = args.no_seqs
         force = args.force
         
-        #set up logging
-        handler = logging.StreamHandler()
-        fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-        handler.setFormatter(logging.Formatter(fmt_str))
-        logger = logging.getLogger(__name__)
-        logger.addHandler(handler)
+        
                 
         fh=logging.FileHandler(args.log)
         logger.addHandler(fh)
