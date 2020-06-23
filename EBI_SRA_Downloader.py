@@ -8,7 +8,7 @@ import subprocess
 from xmltodict import parse
 from lxml import etree
 import os
-from os import path, makedirs
+from os import path, makedirs, remove
 from pathlib import Path
 from urllib.request import urlretrieve
 from argparse import ArgumentParser
@@ -76,7 +76,7 @@ def qiimp_parser(filename):
             # The FullLoader parameter handles the conversion from YAML
             # scalar values to Python the dictionary format
             parsed_yml=yaml.load(file, Loader=yaml.FullLoader)
-            print(parsed_yml)
+            if DEBUG: logger.info(parsed_yml)
     else:
         logger.warning("Invalid file extension for yaml parsing: " + str(ext))
     
@@ -89,9 +89,6 @@ def add_yaml_validators(validators,field='scientific_name'):
     yaml_dict={}
     for v in validators:
         new_yaml={}
-        test=qiimp_parser(v)
-        #print(test)
-        print(test.keys())
         try:
             new_yaml = qiimp_parser(v)
         except:
@@ -111,7 +108,7 @@ def add_yaml_validators(validators,field='scientific_name'):
     
 #these functions create the study_details files for ebi and sra respectively
 
-def get_study_details(study_accession,mode='ebi'):
+def get_study_details(study_accession,mode='ebi',prefix=''):
     #need to add check for invalid url!
     if mode == 'ebi':        
         host = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession="
@@ -154,162 +151,204 @@ def get_study_details(study_accession,mode='ebi'):
     else:
         raise Exception(mode + " is not a valid repository.")
     
-    create_details_file(study_df,study_accession,mode)
+    create_details_file(study_df,study_accession,mode,prefix)
     return study_df
     
     
-#new feed in study_df above
-def add_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},sample_type_column='scientific_name'):
-    if mode =='ebi':
-        identifier = 'secondary_sample_accession'
-        run_accession = 'run_accession'        
-        input_df['platform']=input_df['instrument_platform']
-    elif mode == 'sra':
-        identifier = 'sample'
-        run_accession = 'run'
-        lib_strategy='library_source'
-        input_df['instrument_model']=input_df['model']
-    else:
-        raise Exception(mode + " is not a valid repository.")
-        
-    #Note: for now this loop just uses the data in EBI since it is mirrored with NCBI    
-    sample_info_list=[]
-    sample_count_dict = {}
-    prep_df_dict={}
+#now feed in study_df above
+def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],sample_type_column='scientific_name'):
     
-    #apply filters for platforms and strategies
-    if len(plat) > 0:
-        for p in plat:
-            input_df = input_df[input_df['platform'] != p]
-    if len(plat) > 0:
-        for s in strat:
-            input_df = input_df[input_df['library_strategy'] != s]
+    #check to see if the .part file already exists:
+    pre_validation_file = prefix + "_unvalidated_sample_info.part"
+    if not path.isfile(pre_validation_file):
+        if mode =='ebi':
+            identifier = 'secondary_sample_accession'
+            run_accession = 'run_accession'        
+            input_df['platform']=input_df['instrument_platform']
+        elif mode == 'sra':
+            identifier = 'sample'
+            run_accession = 'run'
+            lib_strategy='library_source'
+            input_df['instrument_model']=input_df['model']
+        else:
+            raise Exception(mode + " is not a valid repository.")
+
+        #Note: for now this loop just uses the data in EBI since it is mirrored with NCBI    
+        sample_info_list=[]
+        sample_count_dict = {}
+        prep_df_dict={}
+
+        #apply filters for platforms and strategies
+        except_msg=''
+        if len(plat) > 0:
+            except_msg = except_msg + "Selected Platforms: " + str(plat) + "\n Available Platforms:" +\
+                        str(input_df['platform'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['platform'].str.lower().isin(plat)]
             
-    for index, row in input_df.iterrows():
-        sample_accession = row[identifier]
-        prep_type = row['library_strategy']
-        if prep_type not in sample_count_dict.keys() :
-            sample_count_dict[prep_type]= {sample_accession:0}
-        elif sample_accession not in sample_count_dict[prep_type].keys():
-            sample_count_dict[prep_type][sample_accession]= 0
-        else:
-            sample_count_dict[prep_type][sample_accession] = sample_count_dict[prep_type][sample_accession] + 1
-
-        sampleUrl = "http://www.ebi.ac.uk/ena/data/view/" + sample_accession \
-                + "&display=xml"
-        if DEBUG: logger.info(sampleUrl)
-        response = requests.get(sampleUrl)
-        xml_dict=parse(response.content)
-        input_df.at[index,'sample_title_specific']=xml_dict['ROOT']['SAMPLE']['TITLE']
-        sn=xml_dict['ROOT']['SAMPLE']['SAMPLE_NAME']
-        for s in sn.keys():
-            input_df.at[index,s]=sn[s]
-
-        sa=xml_dict['ROOT']['SAMPLE']['SAMPLE_ATTRIBUTES']['SAMPLE_ATTRIBUTE']
-        for s in sa:
-            input_df.at[index,s['TAG']]=s['VALUE']
-        input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
-
-    #need to catch common issue where secondary_sample_accession is identical for unique samples
-    #for now assume that in this case, libarary_name will be unique
-    input_df['sample_name']=input_df[identifier]
-    if len(input_df) > 1 and input_df[identifier].nunique() != 1:
-        if input_df['library_name'].nunique() != 1:
-            input_df['sample_name']=input_df['library_name']
-        else:
-            input_df['sample_name']=input_df[identifier]+ '.' + input_df[run_accession]
-
-    input_df['run_prefix']=input_df[run_accession]
-    
-    output_df=validate_samples(input_df,sample_type_column,validator_files)
-    #tidy input_df before merging
-    #input_df.columns = [split_caps(col) for col in input_df.columns]
-    input_df.columns = [scrub_special_chars(col).lower() for col in input_df.columns]
+        if len(strat) > 0:
+            except_msg = except_msg + "Selected Strategies: " + str(strat) + "\n Available Strategies:" +\
+                        str(input_df['library_strategy'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['library_strategy'].str.lower().isin(strat)]
+            
+        if len(names) > 0:
+            except_msg = except_msg + "Selected scientific names: " + str(names) + "\n Available Scientific Names:" +\
+                        str(input_df['scientific_name'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['scientific_name'].str.lower().isin(names)]
         
-    return input_df
+        if len(input_df) == 0:
+            raise Exception("No files after selection criteria:\n" + except_msg)
+        
+        for index, row in input_df.iterrows():
+            sample_accession = row[identifier]
+            prep_type = row['library_strategy']
+            if prep_type not in sample_count_dict.keys() :
+                sample_count_dict[prep_type]= {sample_accession:0}
+            elif sample_accession not in sample_count_dict[prep_type].keys():
+                sample_count_dict[prep_type][sample_accession]= 0
+            else:
+                sample_count_dict[prep_type][sample_accession] = sample_count_dict[prep_type][sample_accession] + 1
+
+            sampleUrl = "http://www.ebi.ac.uk/ena/data/view/" + sample_accession \
+                    + "&display=xml"
+            if DEBUG: logger.info(sampleUrl)
+
+            response = requests.get(sampleUrl)
+            xml_dict=parse(response.content)
+            input_df.at[index,'sample_title_specific']=xml_dict['ROOT']['SAMPLE']['TITLE']
+
+            sn=xml_dict['ROOT']['SAMPLE']['SAMPLE_NAME']
+            for s in sn.keys():
+                col = scrub_special_chars(s).lower()
+                #print(col)
+                input_df.at[index,col]=sn[s]
+
+            sa=xml_dict['ROOT']['SAMPLE']['SAMPLE_ATTRIBUTES']['SAMPLE_ATTRIBUTE']
+            for s in sa:
+                col = scrub_special_chars(s['TAG']).lower()
+                #print(col)
+                input_df.at[index,col]=s['VALUE']
+            input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
+
+        #set sample_name based on identifier column
+        input_df['sample_name']=input_df[identifier]
+
+        #need to catch common issue where secondary_sample_accession is identical for unique samples
+        #for now assume that in this case, libarary_name will be unique, and if it isn't combined sample and run names
+        if len(input_df) > 1 and input_df[identifier].nunique() == 1:
+            if input_df['library_name'].nunique() != 1:
+                #print(str(len(_input_df)) + " is length and input_df[identifier].nunique() = " + str(input_df[identifier].nunique()))
+                input_df['sample_name']=input_df['library_name']
+            else:
+                input_df['sample_name']=input_df[identifier]+ '.' + input_df[run_accession]
+
+        input_df['run_prefix']=input_df[run_accession]
+
+        #the loop above takes the most time so write out a placeholder file for faster re-running if interrupted
+        input_df.to_csv(pre_validation_file,sep='\t',index=False)    
+    else:
+        input_df = pd.read_csv(pre_validation_file,sep='\t',dtype=str)
+        
+    output_df=validate_samples(input_df,sample_type_column,validator_files,prefix)
+    #tidy output before returning
+    output_df.columns = [scrub_special_chars(col).lower() for col in output_df.columns]
+        
+    return output_df
     
-def validate_samples(raw_df,sample_type_col,yaml_validator_dict):
+def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
     st_list = []
+    msg = ''
     for st in raw_df[sample_type_col].unique():
         df_to_validate = raw_df[raw_df[sample_type_col]==st]
-        if st not in yaml_validator_dict.keys():
-            logger.warning("No yaml file for validating " + st + " You may provide one or more custom files " +
-                  " using the --validators flag.")
+        if force:
+            validator_yaml = yaml.load(open(yaml_validator_dict[0]), Loader=yaml.FullLoader)
+            if 'scientific_name' in df_to_validate.keys():
+                df_to_validate=df_to_validate.rename({'scientific_name':'orig_scientific_name'},axis=1)
         else:
-            with open(yaml_validator_dict[sample_type]) as file:
-                validator_yaml = yaml.load(file, Loader=yaml.FullLoader)
+            if st not in yaml_validator_dict.keys():
+                logger.warning("No yaml file for validating " + st + " You may provide one or more custom files " +
+                  " using the --validators flag.")
+            else:
+                validator_yaml = yaml.load(open(yaml_validator_dict[st]), Loader=yaml.FullLoader)
+           
+        for k in validator_yaml.keys():
+            if k not in df_to_validate.columns:
+                msg= msg + k + ' not found in metadata.\n' 
+                try:
+                    df_to_validate[k]= validator_yaml[k]['default']
+                    msg = msg + "Setting " + k + " to " + validator_yaml[k]['default'] + " for " + st + " samples\n"                     
+                except:
+                    df_to_validate[k]= 'not provided'
+                    msg = msg + k + " has no default in yaml template. Encoding as 'not provided'\n"
+            else:
+                #construct rules
+                uniq = df_to_validate[k].unique()
+                allowed_list = []
+                min_value= ''
+                max_value = ''
+                min_value_excl= ''
+                max_value_excl = ''
+                if 'anyof' in validator_yaml[k].keys():
+                    anyof_list = validator_yaml[k]['anyof']            
+                    for r in anyof_list:
+                        if r['type'] == 'string':
+                            for a in r['allowed']:
+                                allowed_list.append(a)
+                        elif r['type'] == 'number':
+                            if 'min' in r.keys():
+                                min_value = r['min']
+                            if 'max' in r.keys():
+                                max_value = r['max']
+                            if 'min_exclusive' in r.keys():
+                                min_value = r['min']
+                            if 'max_exclusive' in r.keys():
+                                max_value = r['max']
+                elif validator_yaml[k]['type'] in validator_yaml[k].keys():
+                    if validator_yaml[k]['type']== 'string':
+                        allowed_list=validator_yaml[k]['allowed']
+                    if validator_yaml[k]['type'] == 'number' or validator_yaml[k]['type'] =='integer':
+                        if 'min' in validator_yaml[k].keys():
+                            min_value = validator_yaml[k]['min']
+                        if 'max' in validator_yaml[k].keys():
+                            max_value = validator_yaml[k]['max']
+                        if 'min_exclusive' in validator_yaml[k].keys():
+                            min_value_excl = validator_yaml[k]['min']
+                        if 'max_exclusive' in validator_yaml[k].keys():
+                            max_value_excl = validator_yaml[k]['max']
 
-            for k in validator_yaml.keys():
-                if k not in df_to_validate.columns:
-                    msg=k + ' not found in columns.' 
-                    try:
-                        df_to_validate[k]= validator_yaml[k]['default']
-                        msg = msg + "Setting " + k + " to " + validator_yaml[k]['default'] + " for " + st + "samples"                        
-                    except:
-                        df_to_validate[k]= 'not provided'
-                        msg = msg + k + " has no default, will be encoded as 'not provided'"
-                    logger.warning(msg)
-                else:
-                    #construct rules
-                    uniq = df_to_validate[k].unique()
-                    allowed_list = []
-                    min_value= ''
-                    max_value = ''
-                    min_value_excl= ''
-                    max_value_excl = ''
-                    if 'anyof' in validator_yaml[k].keys():
-                        anyof_list = validator_yaml[k]['anyof']            
-                        for r in anyof_list:
-                            if r['type'] == 'string':
-                                for a in r['allowed']:
-                                    allowed_list.append(a)
-                            elif r['type'] == 'number':
-                                if 'min' in r.keys():
-                                    min_value = r['min']
-                                if 'max' in r.keys():
-                                    max_value = r['max']
-                                if 'min_exclusive' in r.keys():
-                                    min_value = r['min']
-                                if 'max_exclusive' in r.keys():
-                                    max_value = r['max']
-                    elif validator_yaml[k]['type'] in validator_yaml[k].keys():
-                        if validator_yaml[k]['type']== 'string':
-                            allowed_list=validator_yaml[k]['allowed']
-                        if validator_yaml[k]['type'] == 'number' or validator_yaml[k]['type'] =='integer':
-                            if 'min' in validator_yaml[k].keys():
-                                min_value = validator_yaml[k]['min']
-                            if 'max' in validator_yaml[k].keys():
-                                max_value = validator_yaml[k]['max']
-                            if 'min_exclusive' in validator_yaml[k].keys():
-                                min_value_excl = validator_yaml[k]['min']
-                            if 'max_exclusive' in validator_yaml[k].keys():
-                                max_value_excl = validator_yaml[k]['max']
-                    
-                    #alert user of issues
-                    for u in uniq:
-                        if not u.isnumeric():
-                            if u not in allowed_list and len(allowed_list) > 0:
-                                logger.warning("Warning " + u + " found in column " + k + " but not allowed per Qiimp template. " 
-                                     + "valid values: " + str(allowed_list))          
-                        else:
-                            if u not in allowed_list: #assume it's actually a number
-                                if min_value != '' and u < min_value:
-                                    logger.warning("Warning " + u + " found in column " + k + " but less than min value per Qiimp template: "
-                                         + str(min_value))
-                                if max_value != '' and u > max_value:
-                                    logger.warning("Warning " + u + " found in column " + k + " but more than max value per Qiimp template: "
-                                         + str(max_value))
-                                if min_value_excl != '' and u <= min_value_excl:
-                                    logger.warning("Warning " + u + " found in column " + k + " but less than min value per Qiimp template: "
-                                         + str(min_value_excl))
-                                if max_value_excl != '' and u >= max_value_excl:    
-                                    logger.warning("Warning " + u + " found in column " + k + " but not allowed per Qiimp template: "
-                                         + str(max_value_excl))
+                #alert user of issues
+                for u in uniq:
+                    if not u.isnumeric():
+                        if u not in allowed_list and len(allowed_list) > 0:
+                            msg = msg + "Warning " + u + " found in column " + k + " but not allowed per Qiimp template." +\
+                            "valid values: " + str(allowed_list) + "\n"          
+                    else:
+                        if u not in allowed_list: #assume it's actually a number
+                            if min_value != '' and u < min_value:
+                                msg = msg + "Warning " + u + " found in column " + k + " but less than min value per yaml: " +\
+                                str(min_value) + "\n"
+                            if max_value != '' and u > max_value:
+                                msg = msg + "Warning " + u + " found in column " + k + " but more than max value per yaml: " +\
+                                     str(max_value) + "\n"
+                            if min_value_excl != '' and u <= min_value_excl:
+                                msg = msg + "Warning " + u + " found in column " + k + " but less than min value per yaml: " +\
+                                     str(min_value_excl) + "\n"
+                            if max_value_excl != '' and u >= max_value_excl:    
+                                lmsg = msg + "Warning " + u + " found in column " + k + " but not allowed per yaml: " +\
+                                str(max_value_excl) + "\n"
         st_list.append(df_to_validate)
+        if len(msg) > 0:
+            logger.warning("Errors found during validation:")
+            logger.warning(msg)
+            if DEBUG:
+                valid_log_filename = prefix + "_" + st + '_validation_errors.log'
+                errors = open(valid_log_filename, "w")
+                n = errors.write(msg)
+                errors.close()
+                logger.warning("Validation errors written to " + valid_log_filename)
     valid_df = pd.concat(st_list)
     return valid_df
     
-def create_details_file(study_details_df, study_accession,mode='ebi',file_suffix="_detail"):
+def create_details_file(study_details_df, study_accession,mode='ebi',prefix='',file_suffix="_detail"):
     """Returns the details of the EBI/SRA study
 
     If the accession ID is valid, generate a .details.txt, and return the
@@ -328,7 +367,9 @@ def create_details_file(study_details_df, study_accession,mode='ebi',file_suffix
     string
         study details file name
     """
-    study_details = study_accession + "_" + mode + file_suffix + ".txt"
+    if len(prefix)==0:
+        prefix = study_accession
+    study_details = prefix + "_" + mode + file_suffix + ".txt"
     study_details_df.to_csv(study_details,sep='\t',header=True,index=False)
     return study_details
     
@@ -337,13 +378,20 @@ def write_info_files(final_df,prefix=''):
     final_df.columns =[scrub_special_chars(col).lower() for col in final_df.columns]
     if DEBUG: logger.info(final_df.columns)
     #write sample_info
-    sample_df=final_df[final_df.columns[~final_df.columns.isin(prep_info_columns)]].set_index('sample_name',inplace=False)
-    sample_df=sample_df.dropna(axis=1,how='all')
+    sample_df=final_df[final_df.columns[~final_df.columns.isin(prep_info_columns)]]
+    sample_df=sample_df.set_index('sample_name').dropna(axis=1,how='all')
     sample_df.to_csv(prefix+'_sample_info.tsv',sep='\t',index=True,index_label='sample_name')
+    
+    #clean up pre-validation file assuming correct validation
+    if not DEBUG:
+        pre_validation_file = prefix + "_unvalidated_sample_info.part"
+        if path.isfile(pre_validation_file):
+            remove(pre_validation_file)
+            
+    prep_info_columns.append('sample_name') #add to list for writing out prep files
     for prep_file in final_df['prep_file']:
         prep_df = final_df[final_df['prep_file']==prep_file]
-        prep_info_columns.append('sample_name')
-        prep_df= prep_df[prep_info_columns].set_index('sample_name',inplace=False)
+        prep_df= prep_df[prep_df.columns[prep_df.columns.isin(prep_info_columns)]].set_index('sample_name')
         prep_df=prep_df.dropna(axis=1,how='all')
         prep_df.to_csv(prefix+'_prep_info_'+ prep_file + '.tsv',sep='\t',index=True,index_label='sample_name')            
         
@@ -392,13 +440,13 @@ if __name__ == '__main__':
                             'script: 1)lxml 2)pandas 3)glob 4)csv 5)sys ' +
                             '6)urllib 7)argparse 8)requests 9)xmltodict ' +
                             '10)subprocess 11)bioconda 12)sra-tools 13)os ' +
-                            '14)entrez-direct 15) pyyaml')
+                            '14)entrez-direct 15)pyyaml')
     parser.add_argument("-project","--project", nargs='*',help="EBI/ENA project or study accession(s) " +
                         "to retrieve")
-    parser.add_argument("-o","--output", default='./',help='directory for output files. Default is working directory')
+    parser.add_argument("-o","--output", default='./',help='directory for output files. Default is working directory.')
     parser.add_argument("-mode", "--mode", default='ebi', help="sra accession " +
-                        "repository to be queried", choices=['ebi','sra'])
-    parser.add_argument("-prefix", "--prefix", default='', help="prefix to prepend to output info files")
+                        "repository to be queried.", choices=['ebi','sra'])
+    parser.add_argument("-prefix", "--prefix", nargs='*', help="prefix(es) to prepend to output info files")
     parser.add_argument("-strat","--strategies",nargs='*',choices=['POOLCLONE','CLONE','CLONEEND','WGS','WGA',
                                                        'WCS','WXS','AMPLICON','ChIP-Seq','RNA-Seq',
                                                        'MRE-Seq','MeDIP-Seq','MBD-Seq','MNase-Seq',
@@ -407,28 +455,29 @@ if __name__ == '__main__':
                                                        'TS','Tn-Seq','VALIDATION','FAIRE-seq','SELEX',
                                                        'RIP-Seq','ChIA-PET','RAD-Seq'],
                         help="list of one or more libary strategies to restrict selection.")
-    parser.add_argument("-plat", "--platforms", nargs='*', choices=['LS454','Illumina','Ion Torrent','PacBio_SMRT',
-                                                                                        'OXFORD_NANOPORE'],
+    parser.add_argument("-plat", "--platforms", nargs='*', choices=['LS454','Illumina','Ion Torrent','PacBio_SMRT','OXFORD_NANOPORE'],
                         help="List of one or more platforms to restrict selection.")
+    parser.add_argument("-name","--scientific_names",nargs='*',help="List of scientific_names to restrict for selection.")
     parser.add_argument("-yaml","--validators",nargs='*', help="one or more yaml files in QIIMP format for validation.")
     parser.add_argument("-yaml-dir","--yaml_dir", default ='./', help="one or more yaml files in QIIMP format for validation.")
-    parser.add_argument("-no-seqs", "--no_seqs", default=False,action='store_true', help="Omit download of fastq files")
+    parser.add_argument("-no-seqs", "--no_seqs", default=False,action='store_true', help="Omit download of fastq files.")
     parser.add_argument("-sep","--sep",default=';',help="separator for parsing description, default is ';' ")
-    parser.add_argument("-v", "--verbose", default=False, action='store_true', help="Output additional messages")
-    parser.add_argument("-log", "--log", default='./output.log',help="filename for logger")
+    parser.add_argument("-v", "--verbose", default=False, action='store_true', help="Output additional messages.")
+    parser.add_argument("-log", "--log", default='./output.log',help="filename for logger.")
+    parser.add_argument("-f","--force",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
 
     args = parser.parse_args()
     
     if args.project is None:
         logger.warning("""
-                python EBI_SRA_Downloader.py [accession] [accession ... N]
+                python EBI_SRA_Downloader.py -project [accession] [accession ... N]
                     Generate the study info, study detail, prep, and  sample
                     files for the entered EBI accession, and download the
                     FASTQ files.
                 Optional flags:
                     -output [directory where files will be saved]
                     -mode [specifies which repository to use]                    
-                    -prefix [prefix for sample and prep info files]
+                    -prefix [list of prefixes for sample and prep info files]
                     --strategy [list of one or more library strategies to select]
                     --platforms [list of one or more sequencing platforms to select]
                     --validators [list of one or more yaml files to use in validating]
@@ -443,6 +492,7 @@ if __name__ == '__main__':
         sep= args.sep
         DEBUG = args.verbose
         omit_seqs = args.no_seqs
+        force = args.force
         
         #set up logging
         handler = logging.StreamHandler()
@@ -454,15 +504,11 @@ if __name__ == '__main__':
         fh=logging.FileHandler(args.log)
         logger.addHandler(fh)
         if DEBUG: logger.setLevel(logging.INFO)
-
-        
-    
+   
         # Output directory
         output = args.output
-        
         if list(output)[-1] != '/':
             output = output + '/'
-        prefix = output + args.prefix \
         
         #set up validators
         yaml_validator_dict = {}
@@ -473,30 +519,56 @@ if __name__ == '__main__':
                 yaml_list.append(y)
         else:
             for file in os.listdir(args.yaml_dir):
-                if file.endswith(".yml"):
+                if file.endswith(".yml") or file.endswith(".yaml"):
                     yaml_list.append(os.path.join(args.yaml_dir, file))
-                      
-        yaml_validator_dict = add_yaml_validators(yaml_list)
+        
+        #since we're provding a way to override parsing, check assumption that a single validator is being passed
+        if force:
+            if len(yaml_list) > 1:
+                raise Exception("Error: more than one yaml supplied with 'force' mode. Please supply only one yaml file." +\
+                                "Note .yml and .yaml files in working directory (or specified by --yaml_dir) are loaded if " +\
+                                " no -yaml flag is supplied. Loaded: " + str(yaml_list))
+            elif len(yaml_list) == 0:
+                raise Exception("Error: no yaml supplied with 'force' mode. Please supply only one yaml file.")
+            else:
+                yaml_validator_dict = yaml_list
+        else:
+            yaml_validator_dict = add_yaml_validators(yaml_list)
                        
         platforms=[]
         if args.platforms is not None:
             for p in args.platforms:
-                platforms.append(p)
+                platforms.append(p.lower())
         
         strategies =[]
         if args.strategies is not None:
             for s in args.strategies:
-                strategies.append(s)
-                       
+                strategies.append(s.lower())
+        
+        names=[]
+        if args.scientific_names is not None:
+            for n in args.scientific_names:
+                names.append(n.lower())
+        
         # Retreive study information
+        p_count=0
         for p in args.project:
-            study = get_study_details(p,mode)
+            if args.prefix is not None:
+                if len(args.prefix) == 1:
+                    file_prefix = output + args.prefix[0] + '_' + p
+                elif len(args.prefix) == len(args.project):
+                    file_prefix = output + args.prefix[p_count] + '_' + p
+                else:
+                    raise Exception("Number of prefixes does not match number of projects. Set a single prefix or matched prefixes.")
+            else:
+                file_prefix = p
+            p_count +=1    
+            study = get_study_details(p,mode,file_prefix)
             
             #tidy metadata
-            md=add_sample_info(study,mode,platforms,strategies,yaml_validator_dict)
+            md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names)
             
-            #write out files
-            file_prefix = prefix + '_' + p
+            #write out files            
             write_info_files(md,file_prefix)
             
             if not omit_seqs:
