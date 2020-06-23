@@ -460,7 +460,7 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
                     logger.warning("File exists")
                 else:
                     if not path.exists(output_dir):
-                        makedirs(output_dirh)
+                        makedirs(output_dir)
                     urlretrieve("ftp://" +f, fq_path)
         elif mode =='sra':
             subprocess.run(['fastq-dump', '-I', '--split-files', '--gzip', row['run_accession']])
