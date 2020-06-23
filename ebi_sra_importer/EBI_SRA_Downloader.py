@@ -292,7 +292,7 @@ def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
     for st in raw_df[sample_type_col].unique():
         df_to_validate = raw_df[raw_df[sample_type_col]==st]
         if force:
-            validator_yaml = yaml.load(open(yaml_validator_dict[0]), Loader=yaml.FullLoader)
+            validator_yaml = qiimp_parser(yaml_validator_dict[0])
             if 'scientific_name' in df_to_validate.keys():
                 df_to_validate=df_to_validate.rename({'scientific_name':'orig_scientific_name'},axis=1)
         else:
@@ -300,7 +300,7 @@ def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
                 logger.warning("No yaml file for validating " + st + " You may provide one or more custom files " +
                   " using the --validators flag.")
             else:
-                validator_yaml = yaml.load(open(yaml_validator_dict[st]), Loader=yaml.FullLoader)
+                validator_yaml = qiimp_parser(yaml_validator_dict[st])
            
         for k in validator_yaml.keys():
             if k not in df_to_validate.columns:
@@ -348,7 +348,7 @@ def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
                             max_value_excl = validator_yaml[k]['max']
 
                 #alert user of issues
-                for u in uniq:
+                for u in uniq.astype(str):
                     if not u.isnumeric():
                         if u not in allowed_list and len(allowed_list) > 0:
                             msg = msg + "Warning " + u + " found in column " + k + " but not allowed per Qiimp template." +\
