@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-# conda command to install all dependencies:
-#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools xmltodict lxml -c bioconda -c conda-forge -y
-#
-# pip command to install all dependencies:
-#   pip install csv glob requests subprocess xmltodict sys lxml os urllib
-#   pip install argparse pandas bioconda sra-tools entrez-direct
-#
-# Instruction:
-#       -ebi, -sra flags allow the user to choose download source
-#           python3 EBI_SRA_Downloader.py -ebi {ebiaccession_number}
-#           python3 EBI_SRA_Downloader.py -sra {sraaccession_number}
-#       -sample {name} flag allows the user to specify the sample file name
-#       -prep {name} flag allows the user to specify the prep file name
-#       -study {name} flag allows the user to specify the study info file name
-#       -all-seqs allows the script to accept all sample types
-#       -all-platforms allows the script to accept samples from all platforms
-#       -debug true flag to enter debug mode (not download fastq files)
-#
 # libraries used
 import csv
 import sys
@@ -26,764 +7,395 @@ import requests
 import subprocess
 from xmltodict import parse
 from lxml import etree
-from os import path, makedirs
+import os
+from os import path, makedirs, remove
+from pathlib import Path
 from urllib.request import urlretrieve
 from argparse import ArgumentParser
+import pandas as pd
 from pandas import read_csv, DataFrame
-
-DEBUG = False
-ALL_SEQS = False
-ALL_PLATFORMS = False
-handler = logging.StreamHandler()
-fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-handler.setFormatter(logging.Formatter(fmt_str))
-logger = logging.getLogger(__name__)
-logger.addHandler(handler)
-
-
-def ebi_create_details_file(study_accession, file_suffix="_detail"):
-    """Returns the details of the EBI study
-
-    If the accession ID is valid, generate a .details.txt, and return the
-    detail file name of this EBI study. Else return None
-
-    Parameters
-    ----------
-    study_accession : string
-        The accession ID of the EBI study
-
-    file_suffix : string
-        The suffix for the output study detail file
-
-    Returns
-    -------
-    string
-        study details file name
-    """
-    # Grab the details related to the given accession
-    study_details = study_accession + file_suffix + ".txt"
-    host = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession="
-    read_type = "&result=read_run&"
-    fields = "library_name,secondary_sample_accession,run_accession," + \
-             "experiment_accession,fastq_ftp,library_source," + \
-             "instrument_platform,submitted_format,library_strategy," +\
-             "library_layout"
-    url = ''.join([host, study_accession, read_type, "fields=", fields])
-    response = requests.get(url)
-
-    # Check for valid accessions
-    if not response:
-        raise Exception(study_accession + " is not a valid EBI study ID")
-
-    logger.info("generating study detail file")
-    detailWoHeader = response.content.partition(b'\n')[2]  # remove header
-    detailWoHeader = detailWoHeader.split(b'\n')
-    finalDetail = ""
-    for row in detailWoHeader:
-        if len(row) == 0:
-            continue
-        row_list = row.decode("utf-8").split('\t')
-        if not ALL_SEQS and row_list[5].upper() != "METAGENOMIC":
-            logger.warning("Library source is " + row_list[5] +
-                            " not Metagenomic for " +
-                           row_list[1] + ". Omitting " + row_list[1])
-            continue
-            # skip row
-        elif not ALL_PLATFORMS and row_list[6].lower() != "illumina":
-            logger.warning("platform is " + row_list[6] + 
-                            " not Illumina for " +
-                           row_list[1] + ". Omitting " + row_list[1])
-            continue
-            # skip row
-        else:
-            for i in range(len(row_list)):
-                if len(row_list[i]) == 0:
-                    row_list[i] = "unspecified"
-            if ALL_PLATFORMS:
-                row_string = '\t'.join(row_list)
-            else:
-                row_string = '\t'.join(row_list[:6]) + "\tIllumina\t" + \
-                    '\t'.join(row_list[7:])
-
-        if len(finalDetail) == 0:
-            finalDetail = row_string
-        else:
-            finalDetail = finalDetail + '\n' + row_string
-    if len(finalDetail) == 0:
-        if ALL_SEQS:
-            raise Exception(study_accession + " has no sample or run that" +
-                            " is from Illumina")
-        elif ALL_PLATFORMS:
-            raise Exception(study_accession + " has no sample or run that" +
-                            " is METAGENOMIC")
-        else:
-            raise Exception(study_accession + " has no sample or run that" +
-                            " is METAGENOMIC or from Illumina")
-    with open(study_details, 'w') as file:
-        file.write(finalDetail)
-    return study_details
-
-
-def sra_create_details_file(study_accession, file_suffix="_detail"):
-    """Returns the details of the SRA study
-
-    If the accession ID is valid, generate a .details.txt, and return the
-    detail file name of this SRA study. Else return None
-
-    Parameters
-    ----------
-    study_accession : string
-        The accession ID of the SRA study
-
-    file_suffix : string
-        The suffix for the output study detail file
-
-    Returns
-    -------
-    string
-        study details file name
-    """
-    p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
-                          stdout=subprocess.PIPE)
-    for i in p1.stdout:
-        if "<Count>0</Count>" in i.decode("utf-8"):
-            p1.stdout.close()
-            raise Exception(study_accession + " is not a valid SRA study ID")
-
-    p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
-                          stdout=subprocess.PIPE)
-    p2 = subprocess.Popen(['efetch', '-format', 'runinfo'], stdin=p1.stdout,
-                          stdout=subprocess.PIPE)
-    p1.stdout.close()
-    logger.info("generating study detail file")
-    # since the index of each filed efetch returns may differ
-    # we use a dictionary to get the indices of the fileds we need in the
-    # return content
-    indices = {
-        'library_name': -1,
-        'sample_accession': -1,
-        'run_accession': -1,
-        'experiment_accession': -1,
-        'download_path': -1,
-        'library_source': -1,
-        'platform': -1,
-        'submitted_format': -1,
-        'library_strategy': -1,
-        'library_layout': -1
-    }
-    isHeader = True
-    output = ""
-    for i in p2.stdout:
-        if isHeader:
-            # the header (the first line) returned by efetch has all the
-            # fields' names. we map the fields we need to the corresponding
-            # locations in the header, and get the indices we need for fields.
-            header = i.decode("utf-8").strip().split(',')
-            indices['library_name'] = header.index('LibraryName')
-            indices['sample_accession'] = header.index('Sample')
-            indices['run_accession'] = header.index('Run')
-            indices['experiment_accession'] = header.index('Experiment')
-            indices['download_path'] = header.index('download_path')
-            indices['library_source'] = header.index('LibrarySource')
-            indices['platform'] = header.index('Platform')
-            indices['library_strategy'] = header.index('LibraryStrategy')
-            indices['library_layout'] = header.index('LibraryLayout')
-            isHeader = False
-        else:
-            line = i.decode("utf-8").strip().split(',')
-            if len(line) < indices[max(indices, key=indices.get)]:
-                continue
-            if not ALL_SEQS:
-                if line[indices['library_source']].upper() != "METAGENOMIC":
-                    logger.warning(line[indices['library_source']])
-                    logger.warning("Library source is " +
-                                    line[indices['library_source']] +
-                                    " not Metagenomic for " +
-                                   line[indices['run_accession']] +
-                                   ". Omitting " +
-                                   line[indices['run_accession']])
-                    continue
-            elif not ALL_PLATFORMS:
-                if line[indices['platform']].lower() != "illumina":
-                    logger.warning("Platform is " + 
-                                    line[indices['platform']] +
-                                    " not Illumina for " +
-                                    line[indices['run_accession']] + ". Omitting "
-                                    + line[indices['run_accession']])
-                    continue
-
-            for key in indices:
-                if indices[key] == -1 or len(line[indices[key]]) < 1:
-                    output = output + "unspecified\t"
-                else:
-                    output = output + line[indices[key]] + "\t"
-            output += "\n"
-    p2.stdout.close()
-    if len(output) == 0:
-        if ALL_SEQS:
-            raise Exception(study_accession + " has no sample or run that" +
-                            " is from Illumina")
-        elif ALL_PLATFORMS:
-            raise Exception(study_accession + " has no sample or run that" +
-                            " is METAGENOMIC")
-        else:
-            raise Exception(study_accession + " has no sample or run that is "
-                            " is METAGENOMIC or from Illumina")
-    with open(study_accession + file_suffix + ".txt", "w") as f:
-        f.write(output)
-    return study_accession + file_suffix + ".txt"
-
-
-def ebi_create_info_file(study_file, study_accession, xmlFile='feed.xml'):
-    """fetch the study information of the EBI study based on accession ID
-        and generate a study file for the information
-
-    Parameters
-    ----------
-    study_accession : string
-        The accession ID of the EBI study
-
-    study_file : string
-        The study_info file name
-    """
-    # pull xml from website: https://www.ebi.ac.uk/ena/data/view/ERP012804
-    URL = "http://www.ebi.ac.uk/ena/data/view/{0}&display=xml".\
-        format(study_accession)
-    response = requests.get(URL)
-
-    if len(etree.fromstring(response.content).getchildren()) == 0:
-        logger.warning(study_accession + " is a valid EBI study ID, but its "
-                       + "information (http://www.ebi.ac.uk/ena/data/view/" +
-                       study_accession + ") page is not supported.\nskipping" +
-                       " creating study_info.txt")
-        return
-    is_study = etree.fromstring(response.content).getchildren()[0]
-    if is_study.tag != 'STUDY':
-        if is_study.find('IDENTIFIERS').find('SECONDARY_ID') is None:
-            raise Exception(study_accession + " is not a valid EBI study ID")
-        else:
-            study_accession = is_study.find('IDENTIFIERS').\
-                find('SECONDARY_ID').text
-        URL = "http://www.ebi.ac.uk/ena/data/view/{0}&display=xml".\
-            format(study_accession)
-        response = requests.get(URL)
-
-    logger.info("generating feed.xml file")
-    # Creating a dummy xml to dump the output
-    with open(xmlFile, 'wb') as file:
-        file.write(response.content)
-
-    with open(xmlFile) as fd:
-        doc = parse(fd.read())
-
-    logger.info("generating study info file")
-    study_title = doc['ROOT']['STUDY']['DESCRIPTOR']['STUDY_TITLE']
-    alias = doc['ROOT']['STUDY']['@alias']
-    study_abstract = doc['ROOT']['STUDY']['DESCRIPTOR']['STUDY_ABSTRACT'] \
-        if 'STUDY_ABSTRACT' in doc['ROOT']['STUDY']['DESCRIPTOR'] else "None"
-    description = doc['ROOT']['STUDY']['DESCRIPTOR']['STUDY_DESCRIPTION'] \
-        if 'STUDY_DESCRIPTION' in doc['ROOT']['STUDY']['DESCRIPTOR'] \
-        else "None"
-    # Creating default values for PI and env
-    # TODO: Come up with a better way to handle these fields
-    PI = "EBI import"  # default principal investigator
-    env = "miscellaneous natural or artificial environment"
-    # default environmental package
-
-    # Write to the study_file
-    file = open(study_file, "w")
-    file.write("STUDY_TITLE" + "\t" + "ALIAS" + "\t" + "STUDY_ABSTRACT" +
-               "\t" + "STUDY_DESCRIPTION" + "\t" +
-               "PRINCIPAL_INVESTIGATOR" + "\t" +
-               "ENVIRONMENTAL_PACKAGES" + "\n")
-    file.write(study_title + "\t" + alias + "\t" + study_abstract + "\t"
-               + description + "\t" + PI + "\t" + env + "\n")
-    file.close()
-
-
-def sra_create_info_file(study_file, study_accession):
-    """fetch the study information of the SRA study based on accession ID
-        and generate a study file for the information
-
-    Parameters
-    ----------
-    study_accession : string
-        The accession ID of the SRA study
-
-    study_file : string
-        The study_info file name
-    """
-    p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
-                          stdout=subprocess.PIPE)
-    for i in p1.stdout:
-        if "<Count>0</Count>" in i.decode("utf-8"):
-            p1.stdout.close()
-            raise Exception(study_accession + " is not a valid SRA study ID")
-
-    p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
-                          stdout=subprocess.PIPE)
-    p2 = subprocess.Popen(['efetch', '-format', 'native'], stdin=p1.stdout,
-                          stdout=subprocess.PIPE)
-    p1.stdout.close()
-
-    for i in p2.stdout:
-        line = i.decode("utf-8")
-        start = line.find("<STUDY ")
-        if(start != -1):
-            end = line.find("</STUDY>")
-            info = line[start: end+8]
-            doc = parse(info)
-            break
-    p2.stdout.close()
-
-    logger.info("generating study info file")
-    study_title = doc['STUDY']['DESCRIPTOR']['STUDY_TITLE']
-    alias = doc['STUDY']['@alias']
-    study_abstract = doc['STUDY']['DESCRIPTOR']['STUDY_ABSTRACT'] \
-        if 'STUDY_ABSTRACT' in doc['STUDY']['DESCRIPTOR'] else "None"
-    description = doc['STUDY']['DESCRIPTOR']['STUDY_DESCRIPTION'] \
-        if 'STUDY_DESCRIPTION' in doc['STUDY']['DESCRIPTOR'] \
-        else "None"
-    # Creating default values for PI and env
-    # TODO: Come up with a better way to handle these fields
-    PI = "SRA import"  # default principal investigator
-    env = "miscellaneous natural or artificial environment"
-    # default environmental package
-
-    # Write to the study_file
-    file = open(study_file, "w")
-    file.write("STUDY_TITLE" + "\t" + "ALIAS" + "\t" + "STUDY_ABSTRACT" +
-               "\t" + "STUDY_DESCRIPTION" + "\t" +
-               "PRINCIPAL_INVESTIGATOR" + "\t" +
-               "ENVIRONMENTAL_PACKAGES" + "\n")
-    file.write(study_title + "\t" + alias + "\t" + study_abstract + "\t"
-               + description + "\t" + PI + "\t" + env + "\n")
-    file.close()
-
-
-def create_prep_file(prep_file, study_details):
-    """Generate the prep file(s) for EBI study
-
-    Parameters
-    ----------
-    prep_file : string
-        prep file name
-
-    study_details : string
-        study detail file name
-
-    """
-    logger.info("generating prep file(s)")
-    file = open(study_details, 'r')
-    details = [line.strip().split('\t') for line in file]
-    file.close()
-    details = sorted(details, key=lambda l: l[8])
-
-    temp_library_strategy = details[0][8]
-    prep_file_name = prep_file[:prep_file.rfind(".")] + "_" +\
-        temp_library_strategy + prep_file[prep_file.rfind("."):]
-    file = open(prep_file_name, "w")
-    file.write("sample_name" + "\t" + "run_prefix" + "\t"
-               + "experiment_accession" + "\t" + "platform" + "\t"
-               + "library_strategy" + "\t" + "library_source" + "\t"
-               + "library_layout" + "\n")
-    file.close()
-
-    sample_accession = []
-    for row in details:
-        # find which library_strategy it is
-        library_strategy = row[8]
-        if library_strategy != temp_library_strategy:
-            temp_library_strategy = library_strategy
-            sample_accession = []
-            prep_file_name = prep_file[:prep_file.rfind(".")] + "_" +\
-                temp_library_strategy + prep_file[prep_file.rfind("."):]
-            file = open(prep_file_name, "w")
-            file.write("sample_name" + "\t" + "run_prefix" + "\t"
-                       + "experiment_accession" + "\t" + "platform"
-                       + "\t" + "library_strategy" + "\t" + "library_source"
-                       + "\t" + "library_layout" + "\n")
-            file.close()
-
-        sample = row[1]
-        run_prefix = sample + "." + row[2]
-        # find which prep file to write
-        if sample in sample_accession:
-            # sample ID appeared before
-            sample_accession.append(row[1])
-            sample_count = sample_accession.count(row[1])
-            append2 = prep_file_name.rfind(".")
-            next_prep_file = prep_file_name[:append2] + str(sample_count) +\
-                prep_file_name[append2:]
-            file_path = "./" + next_prep_file
-            if not path.exists(file_path):
-                f1 = open(next_prep_file, "w")
-                f1.write("sample_name" + "\t" + "run_prefix" + "\t"
-                         + "experiment_accession" + "\t"
-                         + "platform" + "\t"
-                         + "library_strategy" + "\t"
-                         + "library_source" + "\t"
-                         + "library_layout" + "\n")
-                f1.close()
-            write_prep = next_prep_file
-        else:
-            # sample ID not appeared before
-            sample_accession.append(row[1])
-            write_prep = prep_file_name
-        # write to the selected prep file
-        write_string = (row[1]) + "\t" + run_prefix + "\t" + (row[3]) + "\t" \
-            + (row[6]) + "\t" + (row[8]) + "\t" + (row[5])\
-            + "\t" + (row[9]) + "\n"
-        with open(write_prep) as f1:
-            if write_string in f1.read():
-                continue
-        with open(write_prep, 'a') as f1:
-            f1.write(write_string)
-
-
-def ebi_create_sample_file(sample_file, study_accession, study_details):
-    """fetch the study information of each sample in EBI study
-        and generate a sample file for these information
-
-    Parameters
-    ----------
-    study_accession : string
-        The accession ID of the EBI study
-
-    sample_file : string
-        The sample file name
-
-    study_details : string
-        The study detail file name
-    """
-    def xml_to_dict(xml_fp):
-        # Converts xml string to a dictionary
-        root = etree.parse(xml_fp).getroot()
-        sample = root.getchildren()[0]
-        metadata = {}
-
-        attributes = sample.find('SAMPLE_ATTRIBUTES')
-        for node in attributes.iterfind('SAMPLE_ATTRIBUTE'):
-            tag = node.getchildren()[0]
-            value = node.getchildren()[1]
-            if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'not provided'
-            else:
-                metadata[tag.text.strip('" ').upper()] \
-                    = value.text.strip('" ')
-
-        #adding loops to look for additional data
-        title= sample.find('TITLE')
-        if title.text is None:
-            metadata['title'] = 'not provided'
-        else:
-            metadata['title'] = title.text.strip('" ')
-        description = sample.find('DESCRIPTION')
-        try:
-            if description.text is None:
-                metadata['description'] = 'not provided'
-            else:
-                if sep in description.text:
-                    split_desc=description.text.strip('" ').split(sep)
-                    counter=0
-                    for i in split_desc:
-                        metadata['description_field_' + str(counter)] = i
-                        counter += 1
-                else:
-                    metadata['description'] = description.text.strip('" ')
-        except:
-            metadata['description'] = 'not provided'
-
-        nameInfo = sample.find('SAMPLE_NAME')
-        for node in nameInfo:
-            tag = node.tag
-            value = node.text
-            if value is None:
-                metadata[tag.text.strip('" ').upper()] = 'not provided'
-            else:
-                metadata[tag.strip('" ').upper()] = value.strip('" ')
-
-        idInfo = sample.find('IDENTIFIERS')
-        for node in idInfo:
-            value = node.text
-            d = node.attrib
-            if len(d) > 0:
-                for k in d.keys():
-                    tag = node.tag + "_" + d[k]
-                    if value is None:
-                        metadata[tag.text.strip('" ').upper()] = 'not provided'
-                    else:
-                        metadata[tag.strip('" ').upper()] = value.strip('" ')
-            else:
-                tag = node.tag
-
-                if value is None:
-                    metadata[tag.text.strip('" ').upper()] = 'not provided'
-                else:
-                    metadata[tag.strip('" ').upper()] = value.strip('" ')
-
-        return metadata
-
-    logger.info("downloading sample.txt file for each sample")
-    details_df = read_csv(study_details, sep='\t', header=None)
-    for row in details_df.iterrows():
-        library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + str(library_name)
-
-        sample_accession = row[1][1]
-        if sample_accession == 'unspecified': # and not DEBUG:
-            raise Exception(sample_accession + " does not contain metadata")
-        if path.exists(current_path + "/" + sample_accession + ".txt"):
-            continue
-
-        if not path.exists(current_path):
-            makedirs(current_path)
-
-        tempUrl = "http://www.ebi.ac.uk/ena/data/view/" + sample_accession \
-            + "&display=xml"
-        temp_response = requests.get(tempUrl)
-        if not temp_response:
-            raise Exception(sample_accession + " is not a valid EBI sample ID")
-        with open(current_path + "/" + sample_accession + ".txt", 'wb') as f:
-            f.write(temp_response.content)
-
-    logger.info("generating sample file")
-    # generates content for the sample file
-    all_samp = []
-    all_samp_exp = []
-    # For each sample file containing metadata in xml format,
-    # convert to dictionary format
-    samples = []
-    for fp in glob.glob('%s/*/*.txt' % study_accession):
-        id_, _ = path.splitext(fp)
-        a = id_.rfind("/")
-        newid = id_[a+1:]
-        if newid in samples:
-            continue
-        samples.append(newid)
-        parsed = xml_to_dict(fp)
-        parsed["sample_name"] = newid
-        if '.' in id_:
-            all_samp_exp.append(parsed)
-        else:
-            all_samp.append(parsed)
-
-    all_samp = DataFrame(all_samp, dtype=str).fillna('not provided')
-    all_samp_exp = DataFrame(all_samp_exp, dtype=str).fillna('not provided')
-
-    result = (all_samp, all_samp_exp)
-
-    newlist = []
-    for item in result:
-        header = item.columns[:, ].values.astype(str).tolist()
-        values = item.values.tolist()
-        values = [val+["EBI"] for val in values]
-        listitem = [header] + values
-        newlist.append(listitem)
-    # Contains header names
-    header = newlist[0][0]
-    final = []
-    # The column names should not involve these characters
-    # TODO: Construct a more exclusive list
-    for i in header:
-        temp = str(i).lower().replace(" ", "_").replace("-", "_")\
-            .replace("(", "_").replace(")", "_").replace("/", "per")\
-            .replace("-","_").replace("|","_")
-        final.append(temp)
-    final.append("public_import_source")
-    newlist[0][0] = final
-    # Write to the sample file
-    with open(study_accession + "_sample_info.txt", "w") as f:
-        for items in newlist:
-            wr = csv.writer(f, delimiter="\t")
-            print(items)
-            wr.writerows(items)
-
-
-def sra_create_sample_file(sample_file, study_accession, study_details):
-    """fetch the study information of each sample in SRA study
-        and generate a sample file for these information
-
-    Parameters
-    ----------
-    study_accession : string
-        The accession ID of the SRA study
-
-    sample_file : string
-        The sample file name
-
-    study_details : string
-        The study detail file name
-    """
-    def xml_to_dict(xml_fp):
-        # Converts xml string to a dictionary
-        root = etree.parse(xml_fp).getroot()
-        sample = root.getchildren()[0].find('SAMPLE')
-        metadata = {}
-        attributes = sample.find('SAMPLE_ATTRIBUTES')
-        for node in attributes.iterfind('SAMPLE_ATTRIBUTE'):
-            tag = node.getchildren()[0]
-            value = node.getchildren()[1]
-            if value.text is None:
-                metadata[tag.text.strip('" ').upper()] = 'Not provided'
-            else:
-                metadata[tag.text.strip('" ').upper()] \
-                    = value.text.strip('" ')
-
-         #adding loops to look for additional data
-        title= sample.find('TITLE')
+import re
+import yaml
+
+def split_caps(cap_string):
+    temp_list = []
+    temp_list = re.findall('[A-Z][^A-Z]*', cap_string)
+    if len(temp_list) > 0:
+        return "_".join(temp_list)
+    else:
+        return cap_string
         
-        if title.text is None:
-            metadata['title'] = 'not provided'
-        else:
-            metadata['title'] = title.text.strip('" ')
-        description = sample.find('DESCRIPTION')
+def scrub_special_chars(input_string,custom_dict={}):
+    replace_dict ={"__":"_",
+                   " ":"_",
+                   "-": "_",
+                   "(": "_leftparen_",
+                   ")": "_rightparen_",
+                   "/": "_per_",
+                   "-":"_",
+                   "|":"_bar_",
+                   "~":"_tilde_",
+                   "`":"_",
+                   "@":"_at_",
+                   "#":"_number_",
+                   "$":"dollar",
+                   "%":"_perc_",
+                   "^":"_carrot_",
+                   "&":"_and_",
+                   "*":"_star_",
+                   "+":"_plus",
+                   "=":"_equals",
+                   "\\":"_per_",
+                   "{":"_leftbracket_",
+                   "}":"_rightbracket_",
+                   "[":"_leftbracket_",
+                   "]":"_rightbracket_",
+                   "?":"_question",
+                   "<":"_less_",
+                   ">":"_more_",
+                   ",":"_",
+                   ".":"_",}
+    for k in replace_dict.keys():
+        input_string=input_string.replace(k,replace_dict[k])
+    for k in custom_dict.keys():
+        input_string=input_string.replace(k,custom_dict[k])
+    return input_string
+
+def qiimp_parser(filename):
+    ext=Path(filename).suffix
+    parsed_yml={}
+    if ext == '.xlsx':
         try:
-            if description.text is None:
-                metadata['description'] = 'not provided'
-            else:
-                if sep in description.text:
-                    split_desc=description.text.strip('" ').split(sep)
-                    counter=0
-                    for i in split_desc:
-                        metadata['description_field_' + str(counter)] = i
-                        counter += 1
-                else:
-                    metadata['description'] = description.text.strip('" ')
+            temp_yml=pd.read_excel(filename,sheet_name='metadata_schema',header=None) #assume QIIMP-style excel
+            parsed_yml = yaml.load(temp_yml.at[0,0])
         except:
-            metadata['description'] = 'not provided'
+            logger.warning("Invalid .xlsx file. Please ensure file is from QIIMP or contains a compliant yaml " + 
+                          "in cell A1 of the sheet labelled 'metadata_schema'.")
+    elif ext == '.yml' or ext == '.yaml':
+        with open(filename) as file:
+            # The FullLoader parameter handles the conversion from YAML
+            # scalar values to Python the dictionary format
+            parsed_yml=yaml.load(file, Loader=yaml.FullLoader)
+            if DEBUG: logger.info(parsed_yml)
+    else:
+        logger.warning("Invalid file extension for yaml parsing: " + str(ext))
+    
+    if len(parsed_yml) == 0:
+        logger.warning("The file " + filename +" contains no yaml data. Please check contents and try again.")
+    
+    return parsed_yml 
 
-        nameInfo = sample.find('SAMPLE_NAME')
-        for node in nameInfo:
-            tag = node.tag
-            value = node.text
-            if value is None:
-                metadata[tag.text.strip('" ').upper()] = 'not provided'
-            else:
-                metadata[tag.strip('" ').upper()] = value.strip('" ')
-
-        idInfo = sample.find('IDENTIFIERS')
-        for node in idInfo:
-            value = node.text
-            d = node.attrib
-            if len(d) > 0:
-                for k in d.keys():
-                    tag = node.tag + "_" + d[k]
-                    if value is None:
-                        metadata[tag.text.strip('" ').upper()] = 'not provided'
-                    else:
-                        metadata[tag.strip('" ').upper()] = value.strip('" ')
-            else:
-                tag = node.tag
-
-                if value is None:
-                    metadata[tag.text.strip('" ').upper()] = 'not provided'
-                else:
-                    metadata[tag.strip('" ').upper()] = value.strip('" ')
-
-        poolInfo = sample.find('Pool')
-        for node in poolInfo:
-            value = node.text
-            d = node.attrib
-            if len(d) > 0:
-                for k in d.keys():
-                    tag = node.tag + "_" + d[k]
-                    if value is None:
-                        metadata[tag.text.strip('" ').upper()] = 'not provided'
-                    else:
-                        metadata[tag.strip('" ').upper()] = value.strip('" ')
-            else:
-                tag = node.tag
-                if value is None:
-                    metadata[tag.text.strip('" ').upper()] = 'not provided'
-                else:
-                    metadata[tag.strip('" ').upper()] = value.strip('" ')
-
-        return metadata
-
-    logger.info("downloading sample.txt file for each sample")
-    details_df = read_csv(study_details, sep='\t', header=None)
-    for row in details_df.iterrows():
-        library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + library_name
-        run_accession = row[1][2]
-
-        p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query',
-                               run_accession], stdout=subprocess.PIPE)
-        for i in p1.stdout:
-            if "<Count>0</Count>" in i.decode("utf-8"):
-                p1.stdout.close()
-                raise Exception(run_accession + " is not a valid SRA run ID")
-
-        if path.exists(current_path + "/" + run_accession + ".txt"):
-            continue
-        if not path.exists(current_path):
-            makedirs(current_path)
-
-        p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query',
-                               run_accession], stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['efetch', '-format', 'native'], stdin=p1.stdout,
-                              stdout=subprocess.PIPE)
-        p1.stdout.close()
-
-        with open(current_path + "/" + run_accession + ".txt", 'wb') as f:
-            for i in p2.stdout:
-                f.write(i)
-        p2.stdout.close()
-
-    logger.info("generating sample file")
-    # generates content for the sample file
-    all_samp = []
-    all_samp_exp = []
-    # For each sample file containing metadata in xml format,
-    # convert to dictionary format
-    samples = []
-    for fp in glob.glob('%s/*/*.txt' % study_accession):
-        id_, _ = path.splitext(fp)
-        a = id_.rfind("/")
-        newid = id_[a+1:]
-        if newid in samples:
-            continue
-        samples.append(newid)
-        parsed = xml_to_dict(fp)
-        parsed["sample_name"] = newid
-        if '.' in id_:
-            all_samp_exp.append(parsed)
+def add_yaml_validators(validators,field='scientific_name'):
+    yaml_dict={}
+    for v in validators:
+        new_yaml={}
+        try:
+            new_yaml = qiimp_parser(v)
+        except:
+            logger.warning("Could not open yaml file " + v + " Please ensure the file exists and is a valid yaml file.")
+        
+        if field not in new_yaml.keys():
+            logger.warning("Invalid validator yaml. Please ensure a default value is provided for '" + field +
+                      "'. Available keys in file: " + str(new_yaml.keys()))
+        elif 'default' not in new_yaml[field].keys():
+            logger.warning("Invalid validator yaml. Please ensure a default value is provided for '" + field +
+                      "'. Available keys in : " + field + str(new_yaml[field].keys()))
         else:
-            all_samp.append(parsed)
+            yaml_dict[new_yaml[field]['default']] = v
+            
+    return yaml_dict
+    
+    
+#these functions create the study_details files for ebi and sra respectively
 
-    all_samp = DataFrame(all_samp, dtype=str).fillna('Not provided')
-    all_samp_exp = DataFrame(all_samp_exp, dtype=str).fillna('Not provided')
+def get_study_details(study_accession,mode='ebi',prefix=''):
+    #need to add check for invalid url!
+    if mode == 'ebi':        
+        host = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession="
+        read_type = "&result=read_run&"
+        fields = "library_name,secondary_sample_accession,run_accession," + \
+                 "experiment_accession,fastq_ftp,library_source," + \
+                 "instrument_platform,submitted_format,library_strategy," +\
+                 "library_layout,tax_id,scientific_name,instrument_model," + \
+                "library_selection,center_name,experiment_title," +\
+                "study_title,study_alias,experiment_alias,sample_alias,sample_title"
+        url = ''.join([host, study_accession, read_type, "fields=", fields])
+        if DEBUG: logger.info(url)
+        study_df = pd.read_csv(url,sep='\t')
+        study_df.dropna(axis=1,how='all',inplace=True)
+        
+    elif mode == 'sra':
+        p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
+                          stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['efetch', '-format', 'runinfo'], stdin=p1.stdout,
+                          stdout=subprocess.PIPE)
+        count=0
+        headers=[]
+        for i in p2.stdout:
+            if count == 0:
+                sra_headers = i.decode("utf-8").replace('\n','').split(',')
+                for h in sra_headers:
+                    headers.append(scrub_special_chars(split_caps(h).lower(),custom_dict={'i_d':'id',
+                                                                                    's_r_a':'sra',
+                                                                                    'e_b_i':'ebi',
+                                                                                    's_r_r':'srr',
+                                                                                    'm_b':'mb'}))
+                    study_df=pd.DataFrame({},columns=headers)
+            else:
+                tmp=str(i.decode("utf-8"))
+                
+                if len(tmp) > 1:
+                    a_series = pd.Series(list(csv.reader(tmp.splitlines(),delimiter=','))[0], index = df.columns)
+                    study_df = study_df.append(a_series, ignore_index=True)
+            count += 1
+    else:
+        raise Exception(mode + " is not a valid repository.")
+    
+    create_details_file(study_df,study_accession,mode,prefix)
+    return study_df
+    
+    
+#now feed in study_df above
+def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],sample_type_column='scientific_name'):
+    
+    #check to see if the .part file already exists:
+    pre_validation_file = prefix + "_unvalidated_sample_info.part"
+    if not path.isfile(pre_validation_file):
+        if mode =='ebi':
+            identifier = 'secondary_sample_accession'
+            run_accession = 'run_accession'        
+            input_df['platform']=input_df['instrument_platform']
+        elif mode == 'sra':
+            identifier = 'sample'
+            run_accession = 'run'
+            lib_strategy='library_source'
+            input_df['instrument_model']=input_df['model']
+        else:
+            raise Exception(mode + " is not a valid repository.")
 
-    result = (all_samp, all_samp_exp)
+        #Note: for now this loop just uses the data in EBI since it is mirrored with NCBI    
+        sample_info_list=[]
+        sample_count_dict = {}
+        prep_df_dict={}
 
-    newlist = []
-    for item in result:
-        header = item.columns[:, ].values.astype(str).tolist()
-        values = item.values.tolist()
-        values = [val+["NCBI"] for val in values]
-        listitem = [header] + values
-        newlist.append(listitem)
+        #apply filters for platforms and strategies
+        except_msg=''
+        if len(plat) > 0:
+            except_msg = except_msg + "Selected Platforms: " + str(plat) + "\n Available Platforms:" +\
+                        str(input_df['platform'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['platform'].str.lower().isin(plat)]
+            
+        if len(strat) > 0:
+            except_msg = except_msg + "Selected Strategies: " + str(strat) + "\n Available Strategies:" +\
+                        str(input_df['library_strategy'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['library_strategy'].str.lower().isin(strat)]
+            
+        if len(names) > 0:
+            except_msg = except_msg + "Selected scientific names: " + str(names) + "\n Available Scientific Names:" +\
+                        str(input_df['scientific_name'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['scientific_name'].str.lower().isin(names)]
+        
+        if len(input_df) == 0:
+            raise Exception("No files after selection criteria:\n" + except_msg)
+        
+        for index, row in input_df.iterrows():
+            sample_accession = row[identifier]
+            prep_type = row['library_strategy']
+            if prep_type not in sample_count_dict.keys() :
+                sample_count_dict[prep_type]= {sample_accession:0}
+            elif sample_accession not in sample_count_dict[prep_type].keys():
+                sample_count_dict[prep_type][sample_accession]= 0
+            else:
+                sample_count_dict[prep_type][sample_accession] = sample_count_dict[prep_type][sample_accession] + 1
 
-    # C ontains header names
-    header = newlist[0][0]
-    final = []
-    # The column names should not involve these characters
-    # TODO: Construct a more exclusive list
-    for i in header:
-        temp = str(i).lower().replace(" ", "_").replace("-", "_")\
-            .replace("(", "").replace(")", "").replace("/", "")
-        final.append(temp)
-    final.append("public_import_source")
-    newlist[0][0] = final
-    # Write to the sample file
-    with open(study_accession + "_sample_info.txt", "w") as f:
-        for items in newlist:
-            wr = csv.writer(f, delimiter="\t")
-            wr.writerows(items)
+            sampleUrl = "http://www.ebi.ac.uk/ena/data/view/" + sample_accession \
+                    + "&display=xml"
+            if DEBUG: logger.info(sampleUrl)
 
+            response = requests.get(sampleUrl)
+            xml_dict=parse(response.content)
+            input_df.at[index,'sample_title_specific']=xml_dict['ROOT']['SAMPLE']['TITLE']
 
-def ebi_fetch_data_file(study_accession, study_details):
+            sn=xml_dict['ROOT']['SAMPLE']['SAMPLE_NAME']
+            for s in sn.keys():
+                col = scrub_special_chars(s).lower()
+                #print(col)
+                input_df.at[index,col]=sn[s]
+
+            sa=xml_dict['ROOT']['SAMPLE']['SAMPLE_ATTRIBUTES']['SAMPLE_ATTRIBUTE']
+            for s in sa:
+                col = scrub_special_chars(s['TAG']).lower()
+                #print(col)
+                input_df.at[index,col]=s['VALUE']
+            input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
+
+        #set sample_name based on identifier column
+        input_df['sample_name']=input_df[identifier]
+
+        #need to catch common issue where secondary_sample_accession is identical for unique samples
+        #for now assume that in this case, libarary_name will be unique, and if it isn't combined sample and run names
+        if len(input_df) > 1 and input_df[identifier].nunique() == 1:
+            if input_df['library_name'].nunique() != 1:
+                #print(str(len(_input_df)) + " is length and input_df[identifier].nunique() = " + str(input_df[identifier].nunique()))
+                input_df['sample_name']=input_df['library_name']
+            else:
+                input_df['sample_name']=input_df[identifier]+ '.' + input_df[run_accession]
+
+        input_df['run_prefix']=input_df[run_accession]
+
+        #the loop above takes the most time so write out a placeholder file for faster re-running if interrupted
+        input_df.to_csv(pre_validation_file,sep='\t',index=False)    
+    else:
+        input_df = pd.read_csv(pre_validation_file,sep='\t',dtype=str)
+        
+    output_df=validate_samples(input_df,sample_type_column,validator_files,prefix)
+    #tidy output before returning
+    output_df.columns = [scrub_special_chars(col).lower() for col in output_df.columns]
+        
+    return output_df
+    
+def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
+    st_list = []
+    msg = ''
+    for st in raw_df[sample_type_col].unique():
+        df_to_validate = raw_df[raw_df[sample_type_col]==st]
+        if force:
+            validator_yaml = yaml.load(open(yaml_validator_dict[0]), Loader=yaml.FullLoader)
+            if 'scientific_name' in df_to_validate.keys():
+                df_to_validate=df_to_validate.rename({'scientific_name':'orig_scientific_name'},axis=1)
+        else:
+            if st not in yaml_validator_dict.keys():
+                logger.warning("No yaml file for validating " + st + " You may provide one or more custom files " +
+                  " using the --validators flag.")
+            else:
+                validator_yaml = yaml.load(open(yaml_validator_dict[st]), Loader=yaml.FullLoader)
+           
+        for k in validator_yaml.keys():
+            if k not in df_to_validate.columns:
+                msg= msg + k + ' not found in metadata.\n' 
+                try:
+                    df_to_validate[k]= validator_yaml[k]['default']
+                    msg = msg + "Setting " + k + " to " + validator_yaml[k]['default'] + " for " + st + " samples\n"                     
+                except:
+                    df_to_validate[k]= 'not provided'
+                    msg = msg + k + " has no default in yaml template. Encoding as 'not provided'\n"
+            else:
+                #construct rules
+                uniq = df_to_validate[k].unique()
+                allowed_list = []
+                min_value= ''
+                max_value = ''
+                min_value_excl= ''
+                max_value_excl = ''
+                if 'anyof' in validator_yaml[k].keys():
+                    anyof_list = validator_yaml[k]['anyof']            
+                    for r in anyof_list:
+                        if r['type'] == 'string':
+                            for a in r['allowed']:
+                                allowed_list.append(a)
+                        elif r['type'] == 'number':
+                            if 'min' in r.keys():
+                                min_value = r['min']
+                            if 'max' in r.keys():
+                                max_value = r['max']
+                            if 'min_exclusive' in r.keys():
+                                min_value = r['min']
+                            if 'max_exclusive' in r.keys():
+                                max_value = r['max']
+                elif validator_yaml[k]['type'] in validator_yaml[k].keys():
+                    if validator_yaml[k]['type']== 'string':
+                        allowed_list=validator_yaml[k]['allowed']
+                    if validator_yaml[k]['type'] == 'number' or validator_yaml[k]['type'] =='integer':
+                        if 'min' in validator_yaml[k].keys():
+                            min_value = validator_yaml[k]['min']
+                        if 'max' in validator_yaml[k].keys():
+                            max_value = validator_yaml[k]['max']
+                        if 'min_exclusive' in validator_yaml[k].keys():
+                            min_value_excl = validator_yaml[k]['min']
+                        if 'max_exclusive' in validator_yaml[k].keys():
+                            max_value_excl = validator_yaml[k]['max']
+
+                #alert user of issues
+                for u in uniq:
+                    if not u.isnumeric():
+                        if u not in allowed_list and len(allowed_list) > 0:
+                            msg = msg + "Warning " + u + " found in column " + k + " but not allowed per Qiimp template." +\
+                            "valid values: " + str(allowed_list) + "\n"          
+                    else:
+                        if u not in allowed_list: #assume it's actually a number
+                            if min_value != '' and u < min_value:
+                                msg = msg + "Warning " + u + " found in column " + k + " but less than min value per yaml: " +\
+                                str(min_value) + "\n"
+                            if max_value != '' and u > max_value:
+                                msg = msg + "Warning " + u + " found in column " + k + " but more than max value per yaml: " +\
+                                     str(max_value) + "\n"
+                            if min_value_excl != '' and u <= min_value_excl:
+                                msg = msg + "Warning " + u + " found in column " + k + " but less than min value per yaml: " +\
+                                     str(min_value_excl) + "\n"
+                            if max_value_excl != '' and u >= max_value_excl:    
+                                lmsg = msg + "Warning " + u + " found in column " + k + " but not allowed per yaml: " +\
+                                str(max_value_excl) + "\n"
+        st_list.append(df_to_validate)
+        if len(msg) > 0:
+            logger.warning("Errors found during validation:")
+            logger.warning(msg)
+            if DEBUG:
+                valid_log_filename = prefix + "_" + st + '_validation_errors.log'
+                errors = open(valid_log_filename, "w")
+                n = errors.write(msg)
+                errors.close()
+                logger.warning("Validation errors written to " + valid_log_filename)
+    valid_df = pd.concat(st_list)
+    return valid_df
+    
+def create_details_file(study_details_df, study_accession,mode='ebi',prefix='',file_suffix="_detail"):
+    """Returns the details of the EBI/SRA study
+
+    If the accession ID is valid, generate a .details.txt, and return the
+    detail file name of this EBI/SRA study. Else return None
+
+    Parameters
+    ----------
+    study_accession : string
+        The accession ID of the EBI/SRA study
+
+    file_suffix : string
+        The suffix for the output study detail file
+
+    Returns
+    -------
+    string
+        study details file name
+    """
+    if len(prefix)==0:
+        prefix = study_accession
+    study_details = prefix + "_" + mode + file_suffix + ".txt"
+    study_details_df.to_csv(study_details,sep='\t',header=True,index=False)
+    return study_details
+    
+def write_info_files(final_df,prefix=''):
+    prep_info_columns = ['run_prefix','experiment_accession','platform','instrument_model','library_strategy','library_source','library_layout','library_selection','fastq_ftp']
+    final_df.columns =[scrub_special_chars(col).lower() for col in final_df.columns]
+    if DEBUG: logger.info(final_df.columns)
+    #write sample_info
+    sample_df=final_df[final_df.columns[~final_df.columns.isin(prep_info_columns)]]
+    sample_df=sample_df.set_index('sample_name').dropna(axis=1,how='all')
+    sample_df.to_csv(prefix+'_sample_info.tsv',sep='\t',index=True,index_label='sample_name')
+    
+    #clean up pre-validation file assuming correct validation
+    if not DEBUG:
+        pre_validation_file = prefix + "_unvalidated_sample_info.part"
+        if path.isfile(pre_validation_file):
+            remove(pre_validation_file)
+            
+    prep_info_columns.append('sample_name') #add to list for writing out prep files
+    for prep_file in final_df['prep_file']:
+        prep_df = final_df[final_df['prep_file']==prep_file]
+        prep_df= prep_df[prep_df.columns[prep_df.columns.isin(prep_info_columns)]].set_index('sample_name')
+        prep_df=prep_df.dropna(axis=1,how='all')
+        prep_df.to_csv(prefix+'_prep_info_'+ prep_file + '.tsv',sep='\t',index=True,index_label='sample_name')            
+        
+def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
     """Fetch all the meta file(s) for EBI study
 
     Parameters
@@ -798,196 +410,166 @@ def ebi_fetch_data_file(study_accession, study_details):
 
     logger.info("Downloading the fastqs")
     # Download the fastqs
-    # import the details as a dataframe
-    details_df = read_csv(study_details, sep='\t', header=None)
-    for row in details_df.iterrows():
-        submitted_format = row[1][7]
-        library_name = row[1][0]
-        current_path = "./" + study_accession + "/" + str(library_name)
-        sample_accession = row[1][1]
-        print(sample_accession)
-        run_accession = row[1][2]
-        print(run_accession)
-        fastq_ftp = row[1][4]
-        print(fastq_ftp)
-        if type(row[1][4]) is not str:
-            logger.warning("No fastq ftp found for sample: " + sample_accession
-                           + ", run: " + run_accession)
-            logger.warning("Skipping sample: " + sample_accession + ", run: "
-                           + run_accession)
-            continue
-
-        if not path.exists(current_path):
-            makedirs(current_path)
-
-        fastq_ftp = fastq_ftp.split(';')
-        print(fastq_ftp)
-        if isinstance(submitted_format, str):
-            submitted_format = submitted_format.split(';')
+    
+    for index, row in download_df.iterrows():
+        if mode == 'ebi':
+            files = row['fastq_ftp'].split(';')
+            for f in files:
+                fq_path = output_dir + "/" + f.split('/')[-1]
+                if DEBUG: logger.warning(f)
+                if type(f) != str:
+                    logger.warning("Skipping sample:" + row['sample_name']
+                                   + ", run: " + row['run_accession'] + "No fastq ftp found.")      
+                elif path.isfile(fq_path):
+                    logger.warning("Skipping " + fq_path)
+                    logger.warning("File exists")
+                else:
+                    if not path.exists(output_dir):
+                        makedirs(output_dirh)
+                    urlretrieve("ftp://" +f, fq_path)
+        elif mode =='sra':
+            subprocess.run(['fastq-dump', '-I', '--split-files', '--gzip', row['run_accession']])
         else:
-            submitted_format = None
-
-        print(submitted_format)
-
-        for i in range(len(fastq_ftp)):
-             # Check for the format(sff or fastq)
-            fq_path = current_path + "/" + sample_accession + "." + \
-                run_accession + "_R"
-            
-            #catching strange ebi three-read issue
-            if len(fastq_ftp) == 3 and i == 0:
-                fq_path = fq_path + str(i)
-            #ensure that R always gets at least a 1
-            else:
-                fq_path = fq_path + str(i+1)
-
-            if submitted_format is None and ".sff" in fastq_ftp[i]:
-                fq_path = fq_path + ".sff"
-            elif submitted_format is None and ".fastq.gz" in fastq_ftp[i]:
-                fq_path = fq_path + ".fastq.gz"
-            elif len(submitted_format) < i and submitted_format == "SFF":
-                fq_path = fq_path + ".sff"
-            else:
-                fq_path = fq_path + ".fastq.gz"
-
-            if path.isfile(fq_path):
-                logger.warning("Skipping " + fq_path)
-                logger.warning("File exists")
-                continue
-            urlretrieve("ftp://" + fastq_ftp[i], fq_path)
-
-
-
-
-def sra_fetch_data_file(study_details):
-    """Fetch all the fastq file(s) for SRA study
-
-    Parameters
-    ----------
-    study_details : string
-        study detail file name
-
-    """
-
-    logger.info("Downloading the fastqs")
-    # Download the fastqs
-    # import the details as a dataframe
-    details_df = read_csv(study_details, sep='\t', header=None)
-    for row in details_df.iterrows():
-        subprocess.run(['fastq-dump', '-I', '--split-files', row[1][2]])
-
+            raise Exception(mode + " is not a valid repository")
 
 if __name__ == '__main__':
-
     # parse the flags and initialize output file names
     # TODO:Reword help info
     parser = ArgumentParser(description='Please note that the following ' +
-                            'packages has to be installed for running this ' +
+                            'packages have to be installed for running this ' +
                             'script: 1)lxml 2)pandas 3)glob 4)csv 5)sys ' +
                             '6)urllib 7)argparse 8)requests 9)xmltodict ' +
-                            '10)subprocess 11)bioconda 12)sra-tools 13)os' +
-                            '14)entrez-direct')
-    parser.add_argument("-ebi", "--ebiaccession", help="ebi accession " +
-                        "number whose info is to be processed")
-    parser.add_argument("-sra", "--sraaccession", help="sra accession " +
-                        "number whose info is to be processed")
-    parser.add_argument("-sample", "--sample_fileName", help="sample_file" +
-                        "Name which will contain per sample information")
-    parser.add_argument("-prep", "--prep_fileName", help="prep_fileName" +
-                        " that contains info like: sample-name,prefix of" +
-                        " fastqs/sffs,library-source(metagenomic/genomic/" +
-                        "transcriptional),platform")
-    parser.add_argument("-study", "--study_fileName", help="Study_file" +
-                        " that contains study information")
-    parser.add_argument("-debug", "--debug", action='store_true', help="Debug mode: don't " +
-                        "download fastq files")
-    parser.add_argument("-all-seqs", "--all_seqs", action='store_true', help="Accept " +
-                        "all type of sequence samples")
-    parser.add_argument("-all-platforms", "--all_platforms", action='store_true', help="Accept " +
-                        "all platform samples")
-    parser.add_argument("-sep","--sep",help="separator for description, default is ';' ")
-    args = parser.parse_args()
+                            '10)subprocess 11)bioconda 12)sra-tools 13)os ' +
+                            '14)entrez-direct 15)pyyaml')
+    parser.add_argument("-project","--project", nargs='*',help="EBI/ENA project or study accession(s) " +
+                        "to retrieve")
+    parser.add_argument("-o","--output", default='./',help='directory for output files. Default is working directory.')
+    parser.add_argument("-mode", "--mode", default='ebi', help="sra accession " +
+                        "repository to be queried.", choices=['ebi','sra'])
+    parser.add_argument("-prefix", "--prefix", nargs='*', help="prefix(es) to prepend to output info files")
+    parser.add_argument("-strat","--strategies",nargs='*',choices=['POOLCLONE','CLONE','CLONEEND','WGS','WGA',
+                                                       'WCS','WXS','AMPLICON','ChIP-Seq','RNA-Seq',
+                                                       'MRE-Seq','MeDIP-Seq','MBD-Seq','MNase-Seq',
+                                                       'DNase-Hypersensitivity','Bisulfite-Seq','EST',
+                                                       'FL-cDNA','miRNA-Seq','ncRNA-Seq','FINISHING',
+                                                       'TS','Tn-Seq','VALIDATION','FAIRE-seq','SELEX',
+                                                       'RIP-Seq','ChIA-PET','RAD-Seq'],
+                        help="list of one or more libary strategies to restrict selection.")
+    parser.add_argument("-plat", "--platforms", nargs='*', choices=['LS454','Illumina','Ion Torrent','PacBio_SMRT','OXFORD_NANOPORE'],
+                        help="List of one or more platforms to restrict selection.")
+    parser.add_argument("-name","--scientific_names",nargs='*',help="List of scientific_names to restrict for selection.")
+    parser.add_argument("-yaml","--validators",nargs='*', help="one or more yaml files in QIIMP format for validation.")
+    parser.add_argument("-yaml-dir","--yaml_dir", default ='./', help="one or more yaml files in QIIMP format for validation.")
+    parser.add_argument("-no-seqs", "--no_seqs", default=False,action='store_true', help="Omit download of fastq files.")
+    parser.add_argument("-sep","--sep",default=';',help="separator for parsing description, default is ';' ")
+    parser.add_argument("-v", "--verbose", default=False, action='store_true', help="Output additional messages.")
+    parser.add_argument("-log", "--log", default='./output.log',help="filename for logger.")
+    parser.add_argument("-f","--force",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
 
-    if args.ebiaccession is None and args.sraaccession is None:
-        print("""
-                python EBI_SRA_Downloader.py -ebi [accession]
+    args = parser.parse_args()
+    
+    if args.project is None:
+        logger.warning("""
+                python EBI_SRA_Downloader.py -project [accession] [accession ... N]
                     Generate the study info, study detail, prep, and  sample
                     files for the entered EBI accession, and download the
                     FASTQ files.
-                python EBI_SRA_Downloader.py -sra [accession]
-                    Generate the study info, study detail, prep, and  sample
-                    files for the entered SRA accession, and download the
-                    FASTQ files.
                 Optional flags:
-                    -sample_info [sample_info_file_name]
-                    -prep_info [prep_info_file_name]
-                    -study_info [study_info_file_name]
-                    -debug
-                    -all-seqs
-                    -all-platforms
-                    -sep
+                    -output [directory where files will be saved]
+                    -mode [specifies which repository to use]                    
+                    -prefix [list of prefixes for sample and prep info files]
+                    --strategy [list of one or more library strategies to select]
+                    --platforms [list of one or more sequencing platforms to select]
+                    --validators [list of one or more yaml files to use in validating]
+                    --no_seqs [skip downloading files]
+                    --verbose          
+                    --sep [provide a delimiter for parsing the description field]
                """)
         sys.exit(2)
-
-    DEBUG = args.debug
-    ALL_SEQS = args.all_seqs
-    ALL_PLATFORMS = args.all_platforms
-
-    if args.ebiaccession is not None:
-        # Output file names
-        sample_file_name = args.ebiaccession + "_sample_info.txt" \
-            if args.sample_fileName is None else args.sample_fileName
-        prep_file_name = args.ebiaccession + "_prep_info.txt" \
-            if args.prep_fileName is None else args.prep_fileName
-        study_file_name = args.ebiaccession + "_study_info.txt" \
-            if args.study_fileName is None else args.study_fileName
-
-        #set parser settings
-        sep= ';' if args.sep is None else args.sep
-        # Call create_details_file to generate .details.txt
-        study_details = ebi_create_details_file(args.ebiaccession)
-
-        # Call create_info_file to generate feed.xml file and study_info file
-        ebi_create_info_file(study_file_name, args.ebiaccession)
-
-        # Call create_prep_file to generate prep files (based on .detail.txt)
-        create_prep_file(prep_file_name, study_details)
-
-        # Call create_sample_file to generate sample file
-        # (based on .detail.txt)
-        ebi_create_sample_file(sample_file_name, args.ebiaccession,
-                               study_details)
-        if DEBUG:
-            sys.exit()
-
-        # Call fetch_data_file to download all the fastqs files
-        # (based on .details)
-        # Get metadata info(internally converts xml to tuple format)
-        # ebi_fetch_data_file(args.ebiaccession, 'PRJEB26419_detail.txt')
-        ebi_fetch_data_file(args.ebiaccession, study_details)
-
-    if args.sraaccession is not None:
-        # Output file names
-        sample_file_name = args.sraaccession + "_sample_info.txt" \
-            if args.sample_fileName is None else args.sample_fileName
-        prep_file_name = args.sraaccession + "_prep_info.txt" \
-            if args.prep_fileName is None else args.prep_fileName
-        study_file_name = args.sraaccession + "_study_info.txt" \
-            if args.study_fileName is None else args.study_fileName
-        # Call create_details_file to generate .details.txt
-        study_details = sra_create_details_file(args.sraaccession)
-        # Call create_info_file to generate feed.xml file and study_info file
-        sra_create_info_file(study_file_name, args.sraaccession)
-        # Call create_prep_file to generate prep files (based on .detail.txt)
-        create_prep_file(prep_file_name, study_details)
-        # Call create_sample_file to generate sample file
-        # (based on .detail.txt)
-        sra_create_sample_file(sample_file_name, args.sraaccession,
-                               study_details)
-        if DEBUG:
-            sys.exit()
-
-        # Call fetch_data_file to download all the fastqs files
-        # (based on .details)
-        # Get metadata info(internally converts xml to tuple format)
-        sra_fetch_data_file(study_details)
+    else:
+        #settings
+        mode=args.mode
+        sep= args.sep
+        DEBUG = args.verbose
+        omit_seqs = args.no_seqs
+        force = args.force
+        
+        #set up logging
+        handler = logging.StreamHandler()
+        fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
+        handler.setFormatter(logging.Formatter(fmt_str))
+        logger = logging.getLogger(__name__)
+        logger.addHandler(handler)
+                
+        fh=logging.FileHandler(args.log)
+        logger.addHandler(fh)
+        if DEBUG: logger.setLevel(logging.INFO)
+   
+        # Output directory
+        output = args.output
+        if list(output)[-1] != '/':
+            output = output + '/'
+        
+        #set up validators
+        yaml_validator_dict = {}
+        yaml_list =  []
+        
+        if args.validators is not None:
+            for y in args.validators:
+                yaml_list.append(y)
+        else:
+            for file in os.listdir(args.yaml_dir):
+                if file.endswith(".yml") or file.endswith(".yaml"):
+                    yaml_list.append(os.path.join(args.yaml_dir, file))
+        
+        #since we're provding a way to override parsing, check assumption that a single validator is being passed
+        if force:
+            if len(yaml_list) > 1:
+                raise Exception("Error: more than one yaml supplied with 'force' mode. Please supply only one yaml file." +\
+                                "Note .yml and .yaml files in working directory (or specified by --yaml_dir) are loaded if " +\
+                                " no -yaml flag is supplied. Loaded: " + str(yaml_list))
+            elif len(yaml_list) == 0:
+                raise Exception("Error: no yaml supplied with 'force' mode. Please supply only one yaml file.")
+            else:
+                yaml_validator_dict = yaml_list
+        else:
+            yaml_validator_dict = add_yaml_validators(yaml_list)
+                       
+        platforms=[]
+        if args.platforms is not None:
+            for p in args.platforms:
+                platforms.append(p.lower())
+        
+        strategies =[]
+        if args.strategies is not None:
+            for s in args.strategies:
+                strategies.append(s.lower())
+        
+        names=[]
+        if args.scientific_names is not None:
+            for n in args.scientific_names:
+                names.append(n.lower())
+        
+        # Retreive study information
+        p_count=0
+        for p in args.project:
+            if args.prefix is not None:
+                if len(args.prefix) == 1:
+                    file_prefix = output + args.prefix[0] + '_' + p
+                elif len(args.prefix) == len(args.project):
+                    file_prefix = output + args.prefix[p_count] + '_' + p
+                else:
+                    raise Exception("Number of prefixes does not match number of projects. Set a single prefix or matched prefixes.")
+            else:
+                file_prefix = p
+            p_count +=1    
+            study = get_study_details(p,mode,file_prefix)
+            
+            #tidy metadata
+            md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names)
+            
+            #write out files            
+            write_info_files(md,file_prefix)
+            
+            if not omit_seqs:
+                fetch_sequencing_data(md,output,mode)
