@@ -1,3 +1,28 @@
+#!/usr/bin/env python3
+# conda command to install all dependencies:
+#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools xmltodict lxml pyyaml xlrd -c bioconda -c conda-forge -y
+#
+# pip command to install all dependencies:
+#   pip install csv glob requests subprocess xmltodict sys lxml os urllib pyyaml xlrd
+#   pip install argparse pandas bioconda sra-tools entrez-direct
+#
+# Instruction:
+#       python EBI_SRA_Downloader.py -project [accession] [accession ... N]
+#                   Generate the study info, study detail, prep, and  sample
+#                   files for the entered EBI accession, and download the
+#                   FASTQ files.
+#               Optional flags:
+#                   -output [directory where files will be saved]
+#                   -mode [specifies which repository to use]                    
+#                   -prefix [list of prefixes for sample and prep info files]
+#                   --strategy [list of one or more library strategies to select]
+#                   --platforms [list of one or more sequencing platforms to select]
+#                   --validators [list of one or more yaml files to use in validating]
+#                   --no_seqs [skip downloading files]
+#                   --verbose          
+#                   --sep [provide a delimiter for parsing the description field]
+#
+
 # libraries used
 import csv
 import sys
@@ -156,7 +181,7 @@ def get_study_details(study_accession,mode='ebi',prefix=''):
     
     
 #now feed in study_df above
-def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],sample_type_column='scientific_name'):
+def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],src=[],sample_type_column='scientific_name'):
     
     #check to see if the .part file already exists:
     pre_validation_file = prefix + "_unvalidated_sample_info.part"
@@ -168,7 +193,6 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
         elif mode == 'sra':
             identifier = 'sample'
             run_accession = 'run'
-            lib_strategy='library_source'
             input_df['instrument_model']=input_df['model']
         else:
             raise Exception(mode + " is not a valid repository.")
@@ -191,16 +215,21 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
             input_df = input_df[input_df['library_strategy'].str.lower().isin(strat)]
             
         if len(names) > 0:
-            except_msg = except_msg + "Selected scientific names: " + str(names) + "\n Available Scientific Names:" +\
+            except_msg = except_msg + "Selected Scientific Names: " + str(names) + "\n Available Scientific Names:" +\
                         str(input_df['scientific_name'].str.lower().unique()) + "\n"
             input_df = input_df[input_df['scientific_name'].str.lower().isin(names)]
+        
+        if len(src) > 0:
+            except_msg = except_msg + "Selected Library Sources: " + str(src) + "\n Available Library Sources:" +\
+                        str(input_df['library_source'].str.lower().unique()) + "\n"
+            input_df = input_df[input_df['library_source'].str.lower().isin(src)]
         
         if len(input_df) == 0:
             raise Exception("No files after selection criteria:\n" + except_msg)
         
         for index, row in input_df.iterrows():
             sample_accession = row[identifier]
-            prep_type = row['library_strategy']
+            prep_type = row['library_source']
             if prep_type not in sample_count_dict.keys() :
                 sample_count_dict[prep_type]= {sample_accession:0}
             elif sample_accession not in sample_count_dict[prep_type].keys():
@@ -255,8 +284,11 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
     return output_df
     
 def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
+    #initialize variables
     st_list = []
     msg = ''
+    validator_yaml={}
+    
     for st in raw_df[sample_type_col].unique():
         df_to_validate = raw_df[raw_df[sample_type_col]==st]
         if force:
@@ -447,6 +479,7 @@ if __name__ == '__main__':
     parser.add_argument("-mode", "--mode", default='ebi', help="sra accession " +
                         "repository to be queried.", choices=['ebi','sra'])
     parser.add_argument("-prefix", "--prefix", nargs='*', help="prefix(es) to prepend to output info files")
+    parser.add_argument("-src","--sources",nargs='*', help="list of one or more sources for restricting sample selection.")
     parser.add_argument("-strat","--strategies",nargs='*',choices=['POOLCLONE','CLONE','CLONEEND','WGS','WGA',
                                                        'WCS','WXS','AMPLICON','ChIP-Seq','RNA-Seq',
                                                        'MRE-Seq','MeDIP-Seq','MBD-Seq','MNase-Seq',
@@ -454,14 +487,13 @@ if __name__ == '__main__':
                                                        'FL-cDNA','miRNA-Seq','ncRNA-Seq','FINISHING',
                                                        'TS','Tn-Seq','VALIDATION','FAIRE-seq','SELEX',
                                                        'RIP-Seq','ChIA-PET','RAD-Seq'],
-                        help="list of one or more libary strategies to restrict selection.")
+                        help="list of one or more libary strategies to restrict sample selection.")
     parser.add_argument("-plat", "--platforms", nargs='*', choices=['LS454','Illumina','Ion Torrent','PacBio_SMRT','OXFORD_NANOPORE'],
-                        help="List of one or more platforms to restrict selection.")
+                        help="List of one or more platforms to restrict sample selection.")
     parser.add_argument("-name","--scientific_names",nargs='*',help="List of scientific_names to restrict for selection.")
     parser.add_argument("-yaml","--validators",nargs='*', help="one or more yaml files in QIIMP format for validation.")
     parser.add_argument("-yaml-dir","--yaml_dir", default ='./', help="one or more yaml files in QIIMP format for validation.")
     parser.add_argument("-no-seqs", "--no_seqs", default=False,action='store_true', help="Omit download of fastq files.")
-    parser.add_argument("-sep","--sep",default=';',help="separator for parsing description, default is ';' ")
     parser.add_argument("-v", "--verbose", default=False, action='store_true', help="Output additional messages.")
     parser.add_argument("-log", "--log", default='./output.log',help="filename for logger.")
     parser.add_argument("-f","--force",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
@@ -479,17 +511,16 @@ if __name__ == '__main__':
                     -mode [specifies which repository to use]                    
                     -prefix [list of prefixes for sample and prep info files]
                     --strategy [list of one or more library strategies to select]
+                    --sources [list of one or more library sources to select]
                     --platforms [list of one or more sequencing platforms to select]
                     --validators [list of one or more yaml files to use in validating]
                     --no_seqs [skip downloading files]
                     --verbose          
-                    --sep [provide a delimiter for parsing the description field]
                """)
         sys.exit(2)
     else:
         #settings
         mode=args.mode
-        sep= args.sep
         DEBUG = args.verbose
         omit_seqs = args.no_seqs
         force = args.force
@@ -549,6 +580,11 @@ if __name__ == '__main__':
         if args.scientific_names is not None:
             for n in args.scientific_names:
                 names.append(n.lower())
+                
+        sources=[]
+        if args.sources is not None:
+            for c in args.sources:
+                sources.append(c.lower())
         
         # Retreive study information
         p_count=0
@@ -566,7 +602,7 @@ if __name__ == '__main__':
             study = get_study_details(p,mode,file_prefix)
             
             #tidy metadata
-            md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names)
+            md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names,sources)
             
             #write out files            
             write_info_files(md,file_prefix)
