@@ -405,7 +405,10 @@ def create_details_file(study_details_df, study_accession,mode='ebi',prefix='',f
     study_details_df.to_csv(study_details,sep='\t',header=True,index=False)
     return study_details
     
-def write_info_files(final_df,prefix=''):
+def write_info_files(final_df,max_prep,prefix=''):
+    if max_prep > len(final_df):
+        max_prep = len(final_df)
+        
     prep_info_columns = ['run_prefix','experiment_accession','platform','instrument_model','library_strategy',
                          'library_source','library_layout','library_selection','fastq_ftp','ena_checklist',
                          'ena_spot_count','ena_base_count','ena_first_public','ena_last_update','instrument_platform',
@@ -428,7 +431,11 @@ def write_info_files(final_df,prefix=''):
         prep_df = final_df[final_df['prep_file']==prep_file]
         prep_df= prep_df[prep_df.columns[prep_df.columns.isin(prep_info_columns)]].set_index('sample_name')
         prep_df=prep_df.dropna(axis=1,how='all')
-        prep_df.to_csv(prefix+'_prep_info_'+ prep_file + '.tsv',sep='\t',index=True,index_label='sample_name')            
+        prep_df_list = [prep_df[i:i+max_prep] for i in range(0,prep_df.shape[0],max_prep)]
+        prep_count=0
+        for prep in prep_df_list:
+            prep.to_csv(prefix+'_prep_info_'+ prep_file + '_part' + str(prep_count) +'.tsv',sep='\t',index=True,index_label='sample_name')
+            prep_count += 1          
         
 def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
     """Fetch all the meta file(s) for EBI study
@@ -451,7 +458,7 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
             files = row['fastq_ftp'].split(';')
             for f in files:
                 fq_path = output_dir + "/" + f.split('/')[-1]
-                if DEBUG: logger.warning(f)
+                if DEBUG: logger.info(f)
                 if type(f) != str:
                     logger.warning("Skipping sample:" + row['sample_name']
                                    + ", run: " + row['run_accession'] + "No fastq ftp found.")      
@@ -507,6 +514,7 @@ if __name__ == '__main__':
     parser.add_argument("-no-seqs", "--no_seqs", default=False,action='store_true', help="Omit download of fastq files.")
     parser.add_argument("-v", "--verbose", default=False, action='store_true', help="Output additional messages.")
     parser.add_argument("-log", "--log", default='./output.log',help="filename for logger.")
+    parser.add_argument("-prep-max","--prep_max",type=int, default=10000,help="Max number of samples per prep info file.")
     parser.add_argument("-f","--force",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
 
     args = parser.parse_args()
@@ -536,7 +544,7 @@ if __name__ == '__main__':
         DEBUG = args.verbose
         omit_seqs = args.no_seqs
         force = args.force
-        
+        max_prep =args.prep_max
         
                 
         fh=logging.FileHandler(args.log)
@@ -612,7 +620,7 @@ if __name__ == '__main__':
             md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names,sources)
             
             #write out files            
-            write_info_files(md,file_prefix)
+            write_info_files(md,max_prep,file_prefix)
             
             if not omit_seqs:
-                fetch_sequencing_data(md,output,mode)
+                fetch_sequencing_data(md,file_prefix,mode)
