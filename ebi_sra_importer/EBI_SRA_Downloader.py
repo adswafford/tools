@@ -170,7 +170,7 @@ def get_study_details(study_accession,mode='ebi',prefix=''):
                 tmp=str(i.decode("utf-8"))
                 
                 if len(tmp) > 1:
-                    a_series = pd.Series(list(csv.reader(tmp.splitlines(),delimiter=','))[0], index = df.columns)
+                    a_series = pd.Series(list(csv.reader(tmp.splitlines(),delimiter=','))[0], index = study_df.columns)
                     study_df = study_df.append(a_series, ignore_index=True)
             count += 1
     else:
@@ -243,21 +243,24 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
 
             response = requests.get(sampleUrl)
             xml_dict=parse(response.content)
-            input_df.at[index,'sample_title_specific']=xml_dict['ROOT']['SAMPLE']['TITLE']
+            if 'SAMPLE_SET' in xml_dict.keys():
 
-            sn=xml_dict['ROOT']['SAMPLE']['SAMPLE_NAME']
-            for s in sn.keys():
-                col = scrub_special_chars(s).lower()
-                #print(col)
-                input_df.at[index,col]=sn[s]
+                input_df.at[index,'sample_title_specific']=xml_dict['SAMPLE_SET']['SAMPLE']['TITLE']
 
-            sa=xml_dict['ROOT']['SAMPLE']['SAMPLE_ATTRIBUTES']['SAMPLE_ATTRIBUTE']
-            for s in sa:
-                col = scrub_special_chars(s['TAG']).lower()
-                #print(col)
-                input_df.at[index,col]=s['VALUE']
-            input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
+                sn=xml_dict['SAMPLE_SET']['SAMPLE']['SAMPLE_NAME']
+                for s in sn.keys():
+                    col = scrub_special_chars(s).lower()
+                    #print(col)
+                    input_df.at[index,col]=sn[s]
 
+                sa=xml_dict['SAMPLE_SET']['SAMPLE']['SAMPLE_ATTRIBUTES']['SAMPLE_ATTRIBUTE']
+                for s in sa:
+                    col = scrub_special_chars(s['TAG']).lower()
+                    #print(col)
+                    input_df.at[index,col]=s['VALUE']
+                input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
+            else:
+                logger.warning('No metadata found for sample named: ' + sample_accession + ' omitting.')
         #set sample_name based on identifier column
         input_df['sample_name']=input_df[identifier]
 
@@ -455,7 +458,11 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
     
     for index, row in download_df.iterrows():
         if mode == 'ebi':
-            files = row['fastq_ftp'].split(';')
+            try:
+                files = row['fastq_ftp'].split(';')
+            except:
+                files = row['download_path'].split(';')
+
             for f in files:
                 fq_path = output_dir + "/" + f.split('/')[-1]
                 if DEBUG: logger.info(f)
