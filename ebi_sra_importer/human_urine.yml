@@ -1,0 +1,467 @@
+collection_device:
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+collection_method:
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+collection_timestamp:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - regex: '^([0-9]{4})(?:-([0-1][0-2])(?:-([0-3][0-9])(?: ([0-2][0-9])(?::([0-5][0-9])(?::([0-5][0-9]))?)?)?)?)?$'
+    type: datetime
+  empty: false
+  field_desc: The day and time of sampling as a single point in time expressed in
+    24-hour time format, e.g. 2016-11-22.
+  is_phi: false
+  required: true
+description:
+  empty: false
+  field_desc: A description of the sample that can include site, subject, and sample
+    material.
+  is_phi: false
+  required: true
+  type: string
+dna_extracted:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    type: string
+  - allowed:
+    - 'TRUE'
+    - 'FALSE'
+    type: string
+  empty: false
+  field_desc: Whether the DNA been extracted from the sample.
+  is_phi: false
+  required: true
+elevation:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - min: '-413.0'
+    type: number
+  empty: false
+  field_desc: Height of land above sea level in meters at the sampling site
+  is_phi: false
+  required: true
+  units: elevation_units
+elevation_units:
+  allowed:
+  - meters
+  default: meters
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+empo_1:
+  allowed:
+  - Host-associated
+  default: Host-associated
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+empo_2:
+  allowed:
+  - Animal
+  default: Animal
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+empo_3:
+  allowed:
+  - animal corpus
+  default: animal corpus
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+env_biome:
+  allowed:
+  - urban biome
+  default: urban biome
+  empty: false
+  field_desc: Classification of the location where the sample was obtained, from the
+    Environmental Ontology (ENVO).
+  is_phi: false
+  required: true
+  type: string
+env_feature:
+  allowed:
+  - human-associated habitat
+  default: human-associated habitat
+  empty: false
+  field_desc: Classification of a specific feature in the biome, from the Environmental
+    Ontology (ENVO).
+  is_phi: false
+  required: true
+  type: string
+env_material:
+  allowed:
+  - urine
+  default: urine
+  empty: false
+  field_desc: Classification of the material being sampled, from the Environmental
+    Ontology (ENVO).
+  is_phi: false
+  required: true
+  type: string
+env_package:
+  allowed:
+  - human-associated
+  - human-skin
+  - human-oral
+  - human-gut
+  - human-vaginal
+  empty: false
+  field_desc: Environment where the sample was obtained.
+  is_phi: false
+  required: true
+  type: string
+geo_loc_name:
+  empty: false
+  field_desc: The geographical origin of the sample as defined by the country or location
+    as chosen from the GAZ ontology, e.g. USA:CA:San Diego .
+  is_phi: false
+  required: true
+  type: string
+host_age:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    type: string
+  - min_exclusive: '0'
+    type: number
+  empty: false
+  field_desc: Host age in appropriate units
+  is_phi: false
+  required: true
+  units: host_age_units
+host_age_units:
+  allowed:
+  - years
+  default: years
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+host_body_habitat:
+  allowed:
+  - UBERON:genitourinary
+  default: UBERON:genitourinary
+  empty: false
+  field_desc: from UBERON e.g skin, gastrointestinal tract
+  is_phi: false
+  required: true
+  type: string
+host_body_mass_index:
+  anyof:
+  - allowed:
+    - not applicable
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - min_exclusive: '0'
+    type: number
+  empty: false
+  field_desc: Body mass index
+  is_phi: false
+  required: true
+host_body_product:
+  allowed:
+  - UBERON:urine
+  default: UBERON:urine
+  empty: false
+  field_desc: from UBERON e.g. skin, feces
+  is_phi: false
+  required: true
+  type: string
+host_body_site:
+  allowed:
+  - UBERON:kidney
+  default: UBERON:kidney
+  empty: false
+  field_desc: from UBERON e.g. skin of arm, colon
+  is_phi: false
+  required: true
+  type: string
+host_common_name:
+  allowed:
+  - human
+  default: human
+  empty: false
+  field_desc: common usage term for host e.g. human
+  is_phi: false
+  required: true
+  type: string
+host_height:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    type: string
+  - min_exclusive: '0'
+    type: number
+  empty: false
+  field_desc: Height (or length) of host in cm preferred
+  is_phi: false
+  required: true
+  units: host_height_units
+host_height_units:
+  allowed:
+  - cm
+  default: cm
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+host_scientific_name:
+  allowed:
+  - Homo sapiens
+  default: Homo sapiens
+  empty: false
+  field_desc: host scientific name e.g. Homo sapiens
+  is_phi: false
+  required: true
+  type: string
+host_subject_id:
+  empty: false
+  field_desc: A label that applies to all samples belonging to one subject or one
+    sample
+  is_phi: false
+  required: true
+  type: string
+host_taxid:
+  allowed:
+  - '9606'
+  default: '9606'
+  empty: false
+  field_desc: taxonomy id of host e.g. human is 9606
+  is_phi: false
+  required: true
+  type: string
+host_weight:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    type: string
+  - min_exclusive: '0'
+    type: number
+  empty: false
+  field_desc: in kilograms preferred
+  is_phi: false
+  required: true
+  units: host_weight_units
+host_weight_units:
+  allowed:
+  - kg
+  default: kg
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+irb_institute:
+  anyof:
+  - allowed:
+    - not provided
+    type: string
+  - type: string
+  empty: false
+  field_desc: the name of institute that approved the IRB (human studies)
+  is_phi: false
+  required: true
+irb_protocol_id:
+  anyof:
+  - allowed:
+    - not provided
+    type: string
+  - type: string
+  empty: false
+  field_desc: the ID of the IRB protocol that covers the collection and analysis of
+    this sample (human studies)
+  is_phi: false
+  required: true
+latitude:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - max: '90.00'
+    min: '-90.00'
+    type: number
+  empty: false
+  field_desc: Location of the sample site by latitude in decimal degrees, e.g. 32.72
+    for San Diego, USA.
+  is_phi: false
+  required: true
+  units: latitude_units
+latitude_units:
+  allowed:
+  - Decimal degrees
+  default: Decimal degrees
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+life_stage:
+  anyof:
+  - allowed:
+    - not applicable
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - allowed:
+    - adult
+    - juvenile
+    type: string
+  empty: false
+  field_desc: e.g. adult
+  is_phi: false
+  required: true
+longitude:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - max: '180.00'
+    min: '-180.00'
+    type: number
+  empty: false
+  field_desc: Location of the sample site by longitude in decimal degrees, e.g. -117.16
+    for San Diego, USA.
+  is_phi: false
+  required: true
+  units: longitude_units
+longitude_units:
+  allowed:
+  - Decimal degrees
+  default: Decimal degrees
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+physical_specimen_location:
+  empty: false
+  field_desc: Where the sample is stored (if there is any left).
+  is_phi: false
+  required: true
+  type: string
+physical_specimen_remaining:
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - allowed:
+    - 'TRUE'
+    - 'FALSE'
+    type: string
+  empty: false
+  field_desc: Whether there is any raw specimen left to sample.
+  is_phi: false
+  required: true
+sample_name:
+  empty: false
+  is_phi: false
+  regex: ^[a-zA-Z0-9\.]+$
+  required: true
+  type: string
+  unique: true
+sample_type:
+  allowed:
+  - urine
+  default: urine
+  empty: false
+  is_phi: false
+  required: true
+  type: string
+scientific_name:
+  allowed:
+  - urine metagenome
+  default: urine metagenome
+  empty: false
+  field_desc: The scientific name of the metagenome associated with this sample, as
+    defined in the NCBI Taxonomy. Be aware that this is NOT the scientific name of
+    the host! Note that this value must correspond to the taxon id entered in the
+    taxon_id field; for example, for a sample from the human gut, the scientific_name
+    should be human gut microbiome, corresponding to taxon id 408170.
+  is_phi: false
+  required: true
+  type: string
+sex:
+  anyof:
+  - allowed:
+    - not applicable
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - allowed:
+    - female
+    - male
+    - neuter
+    - hermaphrodite
+    type: string
+  empty: false
+  is_phi: false
+  required: true
+taxon_id:
+  allowed:
+  - '1346744'
+  default: '1346744'
+  empty: false
+  field_desc: The NCBI Taxonomy id of the metagenome associated with this sample.
+    Be aware that this is NOT the taxon id of the host! Note that this value must
+    correspond to the scientific name entered in the scientific_name field; for example,
+    for a sample from the human gut, the taxon_id should be 408170, corresponding
+    to the scientific name human gut metagenome.
+  is_phi: false
+  required: true
+  type: string
+time_point:
+  anyof:
+  - allowed:
+    - not applicable
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - type: integer
+  empty: false
+  field_desc: A numeric ID to indicate order of linked samples
+  is_phi: false
+  required: true
+title:
+  empty: false
+  field_desc: Title of study.
+  is_phi: false
+  required: true
+  type: string
+tube_id:
+  empty: false
+  field_desc: The identification of the tube containing the sample.
+  is_phi: false
+  required: true
+  type: string
