@@ -257,7 +257,11 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
                 for s in sa:
                     col = scrub_special_chars(s['TAG']).lower()
                     #print(col)
-                    input_df.at[index,col]=s['VALUE']
+                    try:
+                        input_df.at[index,col]=s['VALUE']
+                    except:
+                        logger.warning('No value found for sample attribute: ' + col + '. Setting to "not provided".')
+                        input_df.at[index,col]='not provided'
                 input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
             else:
                 logger.warning('No metadata found for sample named: ' + sample_accession + ' omitting.')
@@ -375,7 +379,8 @@ def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
             logger.warning("Errors found during validation:")
             logger.warning(msg)
             if DEBUG:
-                valid_log_filename = prefix + "_" + st + '_validation_errors.log'
+                st_log_name=st.replace(' ','_')
+                valid_log_filename = prefix + "_" + st_log_name + '_validation_errors.log'
                 errors = open(valid_log_filename, "w")
                 n = errors.write(msg)
                 errors.close()
