@@ -68,7 +68,6 @@ elevation_units:
 empo_1:
   allowed:
   - Host-associated
-  - Control
   default: Host-associated
   empty: false
   is_phi: false
@@ -77,8 +76,6 @@ empo_1:
 empo_2:
   allowed:
   - Animal
-  - Negative
-  - Positive
   default: Animal
   empty: false
   is_phi: false
@@ -87,7 +84,6 @@ empo_2:
 empo_3:
   allowed:
   - Animal corpus
-  - Sterile water blank
   empty: false
   is_phi: false
   required: true
