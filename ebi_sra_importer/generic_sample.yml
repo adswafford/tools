@@ -68,28 +68,61 @@ elevation_units:
   type: string
 empo_1:
   allowed:
-  - free-living
-  default: free-living
+  - Control
+  - Free-living
+  - Host-associated
+  - Unknown
+  default: Unknown
   empty: false
   is_phi: false
   required: true
   type: string
 empo_2:
   allowed:
-  - saline
-  - non-saline
+  - Animal
+  - Fungus
+  - Negative
+  - Positive
+  - Plant
+  - Saline
+  - Non-saline
+  - Contradictory
+  - Missing
+  default: Missing
   empty: false
   is_phi: false
   required: true
   type: string
 empo_3:
   allowed:
-  - surface (non-saline)
-  - aerosol (non-saline)
-  - sediment (non-saline)
-  - surface (saline)
-  - aerosol (saline)
-  - sediment (saline)
+  - Water (non-saline)
+  - Sediment (non-saline)
+  - Soil (non-saline)
+  - Surface (non-saline)
+  - Subsurface (non-saline)
+  - Aerosol (non-saline)
+  - Water (saline)
+  - Sediment (saline)
+  - Hypersaline (saline)
+  - Surface (saline)
+  - Aerosol (saline)
+  - Animal distal gut
+  - Animal proximal gut
+  - Animal secretion
+  - Animal surface
+  - Animal corpus
+  - Plant secretion
+  - Plant surface
+  - Plant rhizosphere
+  - Plant corpus
+  - Fungus corpus
+  - Fungus surface
+  - Sterile water blank
+  - Single strain
+  - Mock community
+  - Unknown (contradictory)
+  - Unknown (missing)
+  default: Unknown (missing)
   empty: false
   is_phi: false
   required: true
@@ -116,14 +149,33 @@ env_material:
   required: true
   type: string
 env_package:
-  allowed:
-  - built environment
-  default: built environment
+  anyof:
+  - allowed:
+    - not collected
+    - not provided
+    - restricted access
+    type: string
+  - allowed:
+    - air
+    - built environment
+    - host-associated
+    - human-associated
+    - human-skin
+    - human-oral
+    - human-gut
+    - human-vaginal
+    - microbial mat/biofilm
+    - misc environment
+    - plant-associated
+    - sediment
+    - soil
+    - wastewater/sludge
+    - water
+    type: string
   empty: false
   field_desc: Environment where the sample was obtained.
   is_phi: false
   required: true
-  type: string
 geo_loc_name:
   empty: false
   field_desc: The geographical origin of the sample as defined by the country or location
@@ -217,6 +269,127 @@ sample_name:
   type: string
   unique: true
 sample_type:
+  allowed:
+  - bodily fluid
+  - air
+  - plant
+  - algal biofilm
+  - sponge
+  - anal swab
+  - anaerobic digester content
+  - fecal
+  - saliva
+  - skin
+  - food product
+  - arterial plaque
+  - control positive
+  - beach sand
+  - anthropogenic material
+  - surface
+  - insect
+  - secretion
+  - biofilm
+  - body tissue
+  - bird egg
+  - stool
+  - control blank
+  - milk
+  - brackish water
+  - broken well in pcr plate
+  - water
+  - sediment
+  - carcass
+  - cecum content
+  - cecum mucosa
+  - sea water
+  - colon content
+  - colon mucosa
+  - colostrum
+  - control empty
+  - control bench paper
+  - control water
+  - control ethanol
+  - coral
+  - coral mucus
+  - crop content
+  - bacterial culture
+  - oral
+  - duodenum content
+  - duodenum mucosa
+  - dust
+  - cerumen/ear wax
+  - egg
+  - estuary water
+  - eutrophic water
+  - fermented food product
+  - filtration sand
+  - fish digesta
+  - fish gill
+  - fish gut
+  - fish pyloric caeca
+  - fish skin
+  - fish gut mucosa
+  - flower
+  - fresh water
+  - freshwater sediment
+  - gastric mucosa
+  - gizzard content
+  - fruit
+  - groundwater
+  - gut
+  - gut mucosa
+  - hair
+  - hypersaline water
+  - ileum content
+  - ileal mucosa
+  - inoculum
+  - jejunum content
+  - jejunum mucosa
+  - kelp biofilm
+  - leaf litter
+  - leaves
+  - lichen
+  - distal gut
+  - gut luminal content
+  - meconium
+  - microbial mat
+  - mock community
+  - mouse vagina lavage
+  - mucus
+  - must
+  - nasal mucus
+  - nest of egg
+  - undefined sample type
+  - soil
+  - pancreas
+  - photosynthetic mat
+  - rock
+  - plankton
+  - plasma
+  - plumage
+  - reactor sludge
+  - rectum
+  - reef sediment
+  - rhizosphere
+  - saline biofilm
+  - saline lake sediment
+  - saline water
+  - seawater mesocosm
+  - skin areola
+  - small intestine mucosa
+  - sputum
+  - stomach mucosa
+  - control swab
+  - tears
+  - test
+  - tongue
+  - tooth
+  - underground water
+  - undefined reference sample
+  - proximal gut content
+  - urine
+  - vaginal mucus
+  - wetland soil  
   empty: false
   is_phi: false
   required: true
