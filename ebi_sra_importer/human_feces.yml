@@ -158,8 +158,8 @@ host_age_units:
   type: string
 host_body_habitat:
   allowed:
-  - UBERON:gastrointestinal tract
-  default: UBERON:gastrointestinal tract
+  - UBERON:feces
+  default: UBERON:feces
   empty: false
   field_desc: from UBERON e.g skin, gastrointestinal tract
   is_phi: false
@@ -190,8 +190,8 @@ host_body_product:
   type: string
 host_body_site:
   allowed:
-  - UBERON:colon
-  default: UBERON:colon
+  - UBERON:feces
+  default: UBERON:feces
   empty: false
   field_desc: from UBERON e.g. skin of arm, colon
   is_phi: false
