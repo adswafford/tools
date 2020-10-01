@@ -84,7 +84,7 @@ empo_2:
   type: string
 empo_3:
   allowed:
-  - animal secretion
+  - Animal secretion
   default: animal secretion
   empty: false
   is_phi: false
