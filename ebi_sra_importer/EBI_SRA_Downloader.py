@@ -130,12 +130,55 @@ def add_yaml_validators(validators,field='scientific_name'):
             
     return yaml_dict
     
-    
+
+ 
 #these functions create the study_details files for ebi and sra respectively
+def write_config_file(xml_dict,prefix,mode):
+    config_string='[required\ntimeseries_type_id = 1\nmetadata_complete = True\nmixs_compliant = True\n principal_investigator = ebi-import\nreprocess = False'
+    if mode == 'ebi':
+        parse_dict = xml_dict['STUDY_SET']['STUDY']
+    elif mode == 'sra':
+        parse_dict = xml_dict['STUDY']
+    else:
+        print('Received invalid mode: ' + mode)
+        
+    alias='\nstudy_alias = ' + parse_dict['@alias']
+    abstract='\nstudy_abstract = ' + parse_dict['DESCRIPTOR']['STUDY_ABSTRACT']
+    description='\nstudy_description = ' + parse_dict['DESCRIPTOR']['STUDY_DESCRIPTION']
+    title='\nstudy_title = ' + parse_dict['DESCRIPTOR']['STUDY_TITLE']
+    config_string= config_string + alias + description + abstract + 'efo_ids = 1\[optional]' + title
+    
+    study_file = prefix + '_study_config.txt'
+    # Write out study_file
+    file = open(study_file, "w")
+    file.write(config_string)
+    file.close()
+    
 
 def get_study_details(study_accession,mode='ebi',prefix=''):
     #need to add check for invalid url!
-    if mode == 'ebi':        
+    if mode == 'ebi':
+        studyUrl = "http://www.ebi.ac.uk/ena/data/view/" + study_accession \
+                    + "&display=xml"
+        response = requests.get(studyUrl)
+        xml_dict=parse(response.content)
+
+        if 'STUDY_SET' in xml_dict.keys():
+            write_config_file(xml_dict,prefix,mode)
+        elif 'PROJECT_SET' in xml_dict.keys():
+            try:
+                secondary_accession = xml_dict['PROJECT_SET']['PROJECT']['IDENTIFIERS']['SECONDARY_ID']
+                secondaryUrl = "http://www.ebi.ac.uk/ena/data/view/" + secondary_accession \
+                    + "&display=xml"
+                response = requests.get(secondaryUrl)
+                xml_dict=parse(response.content)
+                write_config_file(xml_dict,prefix,mode)
+
+            except:
+                    logger.error("No matching study ID found for project" + study_accession)
+        else:
+            logger.warning("No study information found for" + study_accession)
+
         host = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession="
         read_type = "&result=read_run&"
         fields = "library_name,secondary_sample_accession,run_accession," + \
@@ -148,8 +191,32 @@ def get_study_details(study_accession,mode='ebi',prefix=''):
         if DEBUG: logger.info(url)
         study_df = pd.read_csv(url,sep='\t')
         study_df.dropna(axis=1,how='all',inplace=True)
-        
+
     elif mode == 'sra':
+        p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
+                   stdout=subprocess.PIPE)
+        for i in p1.stdout:
+            if "<Count>0</Count>" in i.decode("utf-8"):
+                p1.stdout.close()
+                raise Exception(study_accession + " is not a valid SRA study ID")
+
+        p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
+                           stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['efetch', '-format', 'native'], stdin=p1.stdout,
+                           stdout=subprocess.PIPE)
+        p1.stdout.close()
+
+        for i in p2.stdout:
+            line = i.decode("utf-8")
+            start = line.find("<STUDY ")
+            if(start != -1):
+                end = line.find("</STUDY>")
+                info = line[start: end+8]
+                doc = parse(info)
+                break
+        p2.stdout.close()
+        write_config_file(doc,study_accession,mode)
+        
         p1 = subprocess.Popen(['esearch', '-db', 'sra', '-query', study_accession],
                           stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['efetch', '-format', 'runinfo'], stdin=p1.stdout,
@@ -168,18 +235,18 @@ def get_study_details(study_accession,mode='ebi',prefix=''):
                     study_df=pd.DataFrame({},columns=headers)
             else:
                 tmp=str(i.decode("utf-8"))
-                
+
                 if len(tmp) > 1:
                     a_series = pd.Series(list(csv.reader(tmp.splitlines(),delimiter=','))[0], index = study_df.columns)
                     study_df = study_df.append(a_series, ignore_index=True)
             count += 1
     else:
         raise Exception(mode + " is not a valid repository.")
-    
-    create_details_file(study_df,study_accession,mode,prefix)
+
+    #create_details_file(study_df,study_accession,mode,prefix)
     return study_df
-    
-    
+
+
 #now feed in study_df above
 def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],src=[],sample_type_column='scientific_name'):
     
@@ -445,6 +512,24 @@ def write_info_files(final_df,max_prep,prefix=''):
             prep.to_csv(prefix+'_prep_info_'+ prep_file + '_part' + str(prep_count) +'.tsv',sep='\t',index=True,index_label='sample_name')
             prep_count += 1          
         
+
+def run_host_depletion(fastq_file_list,cpus=4,filter_db='/databases/bowtie/Human_phiX174',output_dir='./'):
+        if len(fastq_file_list) == 2:
+            subprocess.run(['bowtie2', '-p', cpus, '-x', filter_db, '-1',fastq_file_list[0], '-2', fastq_file_list[1],
+                 '--very-sensitive', '|', 'samtools', 'view', '-f', '12', '-F', '256', '|', 'samtools', 'sort', '-@', '16','-n', '|',
+                 'samtools', 'view','-bS', '|', 'bedtools', 'bamtofastq', '-i', '-', '-fq', fastq_file_list[0].replace('.fastq.gz','R1.filtered'),
+                 '-fq2', fastq_file_list[1].replace('.fastq.gz','R2.filtered')])
+            subprocess.run(['gzip', fastq_file_list[0].replace('.fastq.gz','R1.filtered.fastq.gz')])
+            subprocess.run(['gzip', fastq_file_list[1].replace('.fastq.gz','R2.filtered.fastq.gz')])
+            subprocess.run(['rm', fastq_file_list[0]])
+            subprocess.run(['rm', fastq_file_list[1]])
+        else: #since we checked for >2 files before entering this loop, assume 1, i.e. forward only
+            subprocess.run(['bowtie2', '-p', cpus, '-x', filter_db, '-1',fastq_file_list[0],'--very-sensitive', '|', 'samtools', 'view', '-f', '12',
+                 '-F', '256', '|', 'samtools', 'sort', '-@', '16','-n', '|','samtools', 'view','-bS', '|', 'bedtools', 'bamtofastq', '-i', '-', '-fq',
+                 fastq_file_list[0].replace('.fastq.gz','R1.filtered')])
+            subprocess.run(['gzip', fastq_file_list[0].replace('.fastq.gz','R1.filtered.fastq.gz')])
+            subprocess.run(['rm', fastq_file_list[0]])
+
 def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
     """Fetch all the meta file(s) for EBI study
 
@@ -466,37 +551,59 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
             try:
                 files = row['fastq_ftp'].split(';')
             except:
-                files = row['download_path'].split(';')
-
+                try:
+                    files = row['download_path'].split(';')
+                except:
+                    logger.warning("Skipping sample:" + row['sample_name']
+                                    + ", run: " + row['run_accession'] + "No fastq ftp found.")
+            if host_deplete:
+                if len(files) > 2 and host_deplete:
+                    logger.warning("More than 2 files in the fastq download path. Skipping host depletion for "
+                     + row['sample_name'])
+            hd_file_list =[]
             for f in files:
                 fq_path = output_dir + "/" + f.split('/')[-1]
+                hd_file_list.append(fq_path)
                 if DEBUG: logger.info(f)
                 if type(f) != str:
                     logger.warning("Skipping sample:" + row['sample_name']
-                                   + ", run: " + row['run_accession'] + "No fastq ftp found.")      
+                                   + ", run: " + row['run_accession'] + "fastq ftp path is not string.")      
                 elif path.isfile(fq_path):
                     logger.warning("Skipping " + fq_path)
                     logger.warning("File exists")
                 else:
-                    if not path.exists(output_dir):
-                        makedirs(output_dir)
                     urlretrieve("ftp://" +f, fq_path)
+
+            if host_deplete:
+                if len(hd_file_list) > 2:
+                    logger.warning("More than 2 files in the fastq download path. Skipping host depletion for "
+                         + row['sample_name'])
+                else:
+                    if row['library_strategy']:
+                        logger.info("Running host depletion on " + row['sample_name'])
+                        run_host_depletion(hd_file_list)
+                    else:
+                        logger.info("Skipping host depletion for " + row['sample_name'] + " Library Strategy is "
+                                     + row['library_strategy'] + " not WGS")
         elif mode =='sra':
-            subprocess.run(['fastq-dump', '-I', '--split-files', '--gzip', row['run_accession']])
+            subprocess.run(['fastq-dump', '-I', '--split-files', '--gzip', '--outdir', output_dir, row['run_accession']])
+            #TODO implement host depletion for sra
         else:
             raise Exception(mode + " is not a valid repository")
+
+
 
 if __name__ == '__main__':
     # parse the flags and initialize output file names
     # TODO:Reword help info
-    
+
     #set up logging
     handler = logging.StreamHandler()
     fmt_str = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
     handler.setFormatter(logging.Formatter(fmt_str))
     logger = logging.getLogger(__name__)
     logger.addHandler(handler)
-        
+
     parser = ArgumentParser(description='Please note that the following ' +
                             'packages have to be installed for running this ' +
                             'script: 1)lxml 2)pandas 3)glob 4)csv 5)sys ' +
@@ -528,6 +635,8 @@ if __name__ == '__main__':
     parser.add_argument("-log", "--log", default='./output.log',help="filename for logger.")
     parser.add_argument("-prep-max","--prep_max",type=int, default=10000,help="Max number of samples per prep info file.")
     parser.add_argument("-f","--force",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
+    parser.add_argument("-hd","--host_deplete",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
+    parser.add_argument("-p","--cpus",type=int, default=4,help="Max number of samples per prep info file.")
 
     args = parser.parse_args()
     
@@ -547,7 +656,8 @@ if __name__ == '__main__':
                     --scientific_names [list of one or more scientific names to select]
                     --validators [list of one or more yaml files to use in validating]
                     --no_seqs [skip downloading files]
-                    --verbose          
+                    --prep_max [Max number of samples per prep info file: https://qiita.ucsd.edu/static/doc/html/faq.html?highlight=size#how-should-i-split-my-samples-within-preparations]
+                    --verbose
                """)
         sys.exit(2)
     else:
@@ -557,7 +667,7 @@ if __name__ == '__main__':
         omit_seqs = args.no_seqs
         force = args.force
         max_prep =args.prep_max
-        
+        host_deplete = args.host_deplete
                 
         fh=logging.FileHandler(args.log)
         logger.addHandler(fh)
@@ -565,6 +675,8 @@ if __name__ == '__main__':
    
         # Output directory
         output = args.output
+        if not path.exists(output):
+            makedirs(output)
         if list(output)[-1] != '/':
             output = output + '/'
         
@@ -624,7 +736,7 @@ if __name__ == '__main__':
                 else:
                     raise Exception("Number of prefixes does not match number of projects. Set a single prefix or matched prefixes.")
             else:
-                file_prefix = p
+                file_prefix = output + p
             p_count +=1    
             study = get_study_details(p,mode,file_prefix)
             
@@ -635,4 +747,4 @@ if __name__ == '__main__':
             write_info_files(md,max_prep,file_prefix)
             
             if not omit_seqs:
-                fetch_sequencing_data(md,file_prefix,mode)
+                fetch_sequencing_data(md,output,mode)
