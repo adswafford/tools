@@ -1,8 +1,10 @@
-__First start by creating a conda environment with the needed packages:__  
-conda create -name ebi-sra-importer -c bioconda xmltodict lxml pandas requests sra-tools entrez-direct pyyaml xlrd
+__First, start by creating a conda environment with the needed packages:__ 
 
-Then source activate ebi-sra-importer
-cd to your directory of choice and then run the script. __Note, if you want to first check the metadata before downloading a large number of files, pass the --no_seqs flag.__
+```bash
+conda create --name ebi-sra-importer -c bioconda xmltodict lxml pandas requests sra-tools entrez-direct pyyaml xlrd
+```
+
+Then activate the new conda environment (`source activate ebi-sra-importer`), cd to your directory of choice, and run the script. __Note, if you want to first check the metadata before downloading a large number of files, pass the --no_seqs flag.__
 
 __To run the python script:__  
 	python3 EBI_SRA_Downloader.py -project [ebi or sra accession_number]
