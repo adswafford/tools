@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 # conda command to install all dependencies:
 #   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools xmltodict lxml pyyaml xlrd -c bioconda -c conda-forge -y
+# to enable host depletion use:
+#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools bowtie2 samtools bedtools xmltodict lxml pyyaml xlrd -c bioconda -c conda-forge -y
+# or to enable later after installation:
+#   conda activate ebi_sra_importer
+#   conda install bowtie2 samtools bedtools
 #
 # pip command to install all dependencies:
 #   pip install csv glob requests subprocess xmltodict sys lxml os urllib pyyaml xlrd
 #   pip install argparse pandas bioconda sra-tools entrez-direct
+#   pip install bowtie2 samtools bedtools
 #
 # Instruction:
 #       python EBI_SRA_Downloader.py -project [accession] [accession ... N]
@@ -34,11 +40,13 @@ from xmltodict import parse
 from lxml import etree
 import os
 from os import path, makedirs, remove
+import shutil
 from pathlib import Path
 from urllib.request import urlretrieve
 from argparse import ArgumentParser
 import pandas as pd
 from pandas import read_csv, DataFrame
+import numpy as np
 import re
 import yaml
 
@@ -97,63 +105,119 @@ def qiimp_parser(filename):
             logger.warning("Invalid .xlsx file. Please ensure file is from QIIMP or contains a compliant yaml " + 
                           "in cell A1 of the sheet labelled 'metadata_schema'.")
     elif ext == '.yml' or ext == '.yaml':
-        with open(filename) as file:
+        try:
+            with open(filename) as file:
             # The FullLoader parameter handles the conversion from YAML
-            # scalar values to Python the dictionary format
-            parsed_yml=yaml.load(file, Loader=yaml.FullLoader)
-            if DEBUG: logger.info(parsed_yml)
+            # scalar values to Python dictionary format
+                parsed_yml=yaml.load(file, Loader=yaml.FullLoader)
+                if DEBUG: logger.info(parsed_yml)
+        except:
+            logger.warning("Could not load yaml from " + filename + "Contents:")
+            logger.warning(subprocess.run(['cat',file]))
     else:
         logger.warning("Invalid file extension for yaml parsing: " + str(ext))
-    
+
     if len(parsed_yml) == 0:
         logger.warning("The file " + filename +" contains no yaml data. Please check contents and try again.")
-    
-    return parsed_yml 
 
-def add_yaml_validators(validators,field='scientific_name'):
+    return parsed_yml
+
+def set_yaml_validators(validators,fields=['scientific_name']):
     yaml_dict={}
     for v in validators:
         new_yaml={}
-        try:
-            new_yaml = qiimp_parser(v)
-        except:
-            logger.warning("Could not open yaml file " + v + " Please ensure the file exists and is a valid yaml file.")
-        
-        if field not in new_yaml.keys():
-            logger.warning("Invalid validator yaml. Please ensure a default value is provided for '" + field +
-                      "'. Available keys in file: " + str(new_yaml.keys()))
-        elif 'default' not in new_yaml[field].keys():
-            logger.warning("Invalid validator yaml. Please ensure a default value is provided for '" + field +
-                      "'. Available keys in : " + field + str(new_yaml[field].keys()))
-        else:
-            yaml_dict[new_yaml[field]['default']] = v
-            
-    return yaml_dict
-    
+        #try:
+        new_yaml = qiimp_parser(v)
+        #except:
+        #    logger.warning("Could not open yaml file " + v + " Please ensure the file exists and is a valid yaml file.")
 
- 
+        for field in fields:
+            if field not in new_yaml.keys():
+                logger.warning("Invalid validator yaml. Please ensure a default value is provided for '" + field +
+                      "'. Available keys in file: " + str(new_yaml.keys()))
+            elif 'default' not in new_yaml[field].keys():
+                logger.warning("Invalid validator yaml. Please ensure a default value is provided for '" + field +
+                      "'. Available keys in : " + field + str(new_yaml[field].keys()))
+            else:
+                yaml_dict[new_yaml[field]['default']] = v
+
+    return yaml_dict
+
+def set_empo_normalizers(sample_type_map):
+    empo_type_df =pd.DataFrame()
+    empo_type_df=pd.read_csv(sample_type_map, sep='\t', dtype=str)
+    if 'sample_type' not in empo_type_df: #try to load again as a csv
+        empo_type_df = pd.read_csv(sample_type_map)
+
+    if 'sample_type' not in empo_type_df:
+        logger.warning("sample_type not found in sample type mapping file: " + sample_type_map + "\nAvailable columns: " + empo_type_df.columns)
+    else:
+        empo_type_df=empo_type_df.set_index('sample_type')
+        logger.info("Sample type mapping file found. Adding normalization columns: " + empo_type_df.columns)
+
+    return empo_type_df
+
 #these functions create the study_details files for ebi and sra respectively
-def write_config_file(xml_dict,prefix,mode):
+def write_config_file(xml_dict,prefix,mode,xml_proj_dict={}):
     config_string='[required\ntimeseries_type_id = 1\nmetadata_complete = True\nmixs_compliant = True\n principal_investigator = ebi-import\nreprocess = False'
     if mode == 'ebi':
         parse_dict = xml_dict['STUDY_SET']['STUDY']
     elif mode == 'sra':
         parse_dict = xml_dict['STUDY']
     else:
-        print('Received invalid mode: ' + mode)
-        
-    alias='\nstudy_alias = ' + parse_dict['@alias']
-    abstract='\nstudy_abstract = ' + parse_dict['DESCRIPTOR']['STUDY_ABSTRACT']
-    description='\nstudy_description = ' + parse_dict['DESCRIPTOR']['STUDY_DESCRIPTION']
-    title='\nstudy_title = ' + parse_dict['DESCRIPTOR']['STUDY_TITLE']
+        logger.warning('Received invalid mode: ' + mode)
+
+    title= '\n study_title = XXEBIXX'
+    alias= '\nstudy_alias = XXEBIXX'
+    abstract ='\nstudy_abstract = XXEBIXX'
+    description = '\nstudy_description = XXEBIXX'
+
+    if '@alias' in parse_dict.keys():
+        alias=alias.replace('XXEBIXX',parse_dict['@alias'])
+    elif '@alias' in xml_proj_dict.keys():
+        alias=alias.replace('XXEBIXX',_dict['PROJECT_SET']['PROJECT']['@alias'])
+    else:
+        logger.warning("No alias found, using XXEBIXX for alias.")
+
+    desc_dict={}
+    if 'DESCRIPTOR' in parse_dict.keys():
+        desc_dict = parse_dict['DESCRIPTOR']
+    elif 'IDENTIFIERS' in xml_proj_dict.keys():
+        desc_dict = xml_proj_dict['IDENTIFIERS']
+    else:
+        logger.warning("No DESCRIPTOR or IDENTIFIER values found. Using XXEBIXX for values.")
+
+    if len(desc_dict) > 0:
+        if 'STUDY_ABSTRACT' in desc_dict.keys():
+            abstract=abstract.replace('XXEBIXX',desc_dict['STUDY_ABSTRACT'])
+        elif 'ABSTRACT' in desc_dict.keys():
+            abstract=abstract.replace('XXEBIXX',desc_dict['ABSTRACT'])
+        else:
+            logger.warning("No abstract found, using XXEBIXX for abstract")
+
+        if 'STUDY_DESCRIPTION' in desc_dict.keys():
+            abstract=abstract.replace('XXEBIXX',desc_dict['STUDY_DESCRIPTION'])
+        elif 'DESCRIPTION' in desc_dict.keys():
+            abstract=abstract.replace('XXEBIXX',desc_dict['DESCRIPTION'])
+        else:
+            logger.warning("No description found, using XXEBIXX for description")
+
+        if 'STUDY_TITLE' in desc_dict.keys():
+            title=title.replace('XXEBIXX',desc_dict['STUDY_TITLE'])
+        elif 'TITLE' in desc_dict.keys():
+            title=title.replace('XXEBIXX',desc_dict['TITLE'])
+        else:
+            logger.warning("No title found, using XXEBIXX for title")
+
     config_string= config_string + alias + description + abstract + 'efo_ids = 1\[optional]' + title
-    
+
     study_file = prefix + '_study_config.txt'
+
+    logger.info("In write config")
     # Write out study_file
     file = open(study_file, "w")
     file.write(config_string)
     file.close()
-    
 
 def get_study_details(study_accession,mode='ebi',prefix=''):
     #need to add check for invalid url!
@@ -164,20 +228,22 @@ def get_study_details(study_accession,mode='ebi',prefix=''):
         xml_dict=parse(response.content)
 
         if 'STUDY_SET' in xml_dict.keys():
+            logger.info(study_accession + " is study ID. Writing config file")
             write_config_file(xml_dict,prefix,mode)
         elif 'PROJECT_SET' in xml_dict.keys():
             try:
                 secondary_accession = xml_dict['PROJECT_SET']['PROJECT']['IDENTIFIERS']['SECONDARY_ID']
-                secondaryUrl = "http://www.ebi.ac.uk/ena/data/view/" + secondary_accession \
-                    + "&display=xml"
-                response = requests.get(secondaryUrl)
-                xml_dict=parse(response.content)
-                write_config_file(xml_dict,prefix,mode)
+                secondaryUrl = "http://www.ebi.ac.uk/ena/data/view/" + secondary_accession + "&display=xml"
+                logger.warning(study_accession + " is project ID. Retrieved secondary ID: " + secondary_accession + " Writing config file.")
+                logger.info("Alternate url" + secondaryUrl)
+                response2 = requests.get(secondaryUrl)
+                xml_study_dict=parse(response2.content)
+                write_config_file(xml_study_dict,prefix,mode,xml_dict)
 
             except:
-                    logger.error("No matching study ID found for project" + study_accession)
+                logger.error("No matching study ID found for project " + study_accession)
         else:
-            logger.warning("No study information found for" + study_accession)
+            logger.warning("No study information found for " + study_accession)
 
         host = "http://www.ebi.ac.uk/ena/data/warehouse/filereport?accession="
         read_type = "&result=read_run&"
@@ -248,8 +314,8 @@ def get_study_details(study_accession,mode='ebi',prefix=''):
 
 
 #now feed in study_df above
-def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],src=[],sample_type_column='scientific_name'):
-    
+def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},prefix='',names=[],src=[],empo_mapping=pd.DataFrame(),sample_type_column='scientific_name'):
+
     #check to see if the .part file already exists:
     pre_validation_file = prefix + "_unvalidated_sample_info.part"
     if not path.isfile(pre_validation_file):
@@ -264,7 +330,7 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
         else:
             raise Exception(mode + " is not a valid repository.")
 
-        #Note: for now this loop just uses the data in EBI since it is mirrored with NCBI    
+        #Note: for now this loop just uses the data in EBI since it is mirrored with NCBI
         sample_info_list=[]
         sample_count_dict = {}
         prep_df_dict={}
@@ -335,12 +401,13 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
         #set sample_name based on identifier column
         input_df['sample_name']=input_df[identifier]
 
-        #need to catch common issue where secondary_sample_accession is identical for unique samples
+        #need to catch common issue where identifier is identical for unique samples
         #for now assume that in this case, libarary_name will be unique, and if it isn't combined sample and run names
+
         if len(input_df) > 1 and input_df[identifier].nunique() == 1:
             if input_df['library_name'].nunique() != 1:
                 #print(str(len(_input_df)) + " is length and input_df[identifier].nunique() = " + str(input_df[identifier].nunique()))
-                input_df['sample_name']=input_df['library_name']
+                input_df['sample_name']=input_df['library_name'].apply(lambda x: scrub_special_chars(x))
             else:
                 input_df['sample_name']=input_df[identifier]+ '.' + input_df[run_accession]
 
@@ -350,19 +417,59 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
         input_df.to_csv(pre_validation_file,sep='\t',index=False)    
     else:
         input_df = pd.read_csv(pre_validation_file,sep='\t',dtype=str)
-        
+    
+    #start by normalizing sample types and EMPO fields if sample_type is present
+    if len(empo_mapping) > 0:
+        if 'sample_type' in input_df.columns:
+            input_df = normalize_types(input_df,empo_mapping)
+        else:
+            logger.warning("'sample_type' not found in metadata. Skipping EMPO normalization.")
+
     output_df=validate_samples(input_df,sample_type_column,validator_files,prefix)
     #tidy output before returning
     output_df.columns = [scrub_special_chars(col).lower() for col in output_df.columns]
-        
+
     return output_df
+
+def normalize_types(md,mapping):
+
+    #small modifications from Daniel McDonald normalization code
+    simple_sample_type = mapping['simple_sample_type'].to_dict()
+    empo_1 = mapping['empo_1'].to_dict()
+    empo_2 = mapping['empo_2'].to_dict()
+    empo_3 = mapping['empo_3'].to_dict()
+
+    qsst = [simple_sample_type.get(v) for v in md['sample_type']]
+    qemp1 = [empo_1.get(v) for v in md['sample_type']]
+    qemp2 = [empo_2.get(v) for v in md['sample_type']]
+    qemp3 = [empo_3.get(v) for v in md['sample_type']]
+
+    md['qiita_empo_1'] = qemp1
+    md['qiita_empo_2'] = qemp2
+    md['qiita_empo_3'] = qemp3
+    md['simple_sample_type'] = qsst
     
+    #to check for empo values, need to ensure columns are there to avoid error
+    empo_cols=['empo_1','empo_2','empo_3']
+    for e in empo_cols:
+        if e not in md.columns:
+            md[e]= np.nan
+    # if there is an existing empo value, then let's prefer it
+    emp1 = md[~md['empo_1'].isnull()]
+    emp2 = md[~md['empo_2'].isnull()]
+    emp3 = md[~md['empo_3'].isnull()]
+    md.loc[emp1.index, 'qiita_empo_1'] = emp1['empo_1']
+    md.loc[emp2.index, 'qiita_empo_2'] = emp1['empo_2']
+    md.loc[emp3.index, 'qiita_empo_3'] = emp1['empo_3']
+
+    return md
+
 def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
     #initialize variables
     st_list = []
     msg = ''
     validator_yaml={}
-    
+
     for st in raw_df[sample_type_col].unique():
         df_to_validate = raw_df[raw_df[sample_type_col]==st]
         if force:
@@ -375,7 +482,7 @@ def validate_samples(raw_df,sample_type_col,yaml_validator_dict,prefix):
                   " using the --validators flag.")
             else:
                 validator_yaml = qiimp_parser(yaml_validator_dict[st])
-           
+
         for k in validator_yaml.keys():
             if k not in df_to_validate.columns:
                 msg= msg + k + ' not found in metadata.\n' 
@@ -487,50 +594,114 @@ def write_info_files(final_df,max_prep,prefix=''):
     prep_info_columns = ['run_prefix','experiment_accession','platform','instrument_model','library_strategy',
                          'library_source','library_layout','library_selection','fastq_ftp','ena_checklist',
                          'ena_spot_count','ena_base_count','ena_first_public','ena_last_update','instrument_platform',
-                         'submitted_format','sequencing_method']
+                         'submitted_format','sequencing_method','target_gene','target_subfragment','primer']
+    amplicon_min_prep_list=['target_gene','target_subfragment','primer']
+    amplicon_type_preps = ['AMPLICON','OTHER']
     final_df.columns =[scrub_special_chars(col).lower() for col in final_df.columns]
     if DEBUG: logger.info(final_df.columns)
+    
     #write sample_info
     sample_df=final_df[final_df.columns[~final_df.columns.isin(prep_info_columns)]]
+    
+    #check for duplicates here. N.B. Need to retain previously to enable download of all runs without faffing around with prep files
+    sample_df=sample_df.drop_duplicates('sample_name')
     sample_df=sample_df.set_index('sample_name').dropna(axis=1,how='all')
     sample_df.to_csv(prefix+'_sample_info.tsv',sep='\t',index=True,index_label='sample_name')
-    
+
     #clean up pre-validation file assuming correct validation
     if not DEBUG:
         pre_validation_file = prefix + "_unvalidated_sample_info.part"
         if path.isfile(pre_validation_file):
             remove(pre_validation_file)
-            
-    prep_info_columns.append('sample_name') #add to list for writing out prep files
-    for prep_file in final_df['prep_file']:
+
+    prep_info_columns = ['sample_name'] + prep_info_columns #add to list for writing out prep files
+    for prep_file in final_df['prep_file'].unique():
         prep_df = final_df[final_df['prep_file']==prep_file]
+        if prep_file in amplicon_type_preps: #check to see if the prep is amplicon-style, specified by list above
+            for min_prep in amplicon_min_prep_list: #if amplicon-style, enforce presence or null values for minimum prep info information
+                if min_prep not in prep_df.columns():
+                    prep_df[min_prep]='XXEBIXX' #will throw warning, but okay with current pandas
         prep_df= prep_df[prep_df.columns[prep_df.columns.isin(prep_info_columns)]].set_index('sample_name')
         prep_df=prep_df.dropna(axis=1,how='all')
         prep_df_list = [prep_df[i:i+max_prep] for i in range(0,prep_df.shape[0],max_prep)]
         prep_count=0
         for prep in prep_df_list:
             prep.to_csv(prefix+'_prep_info_'+ prep_file + '_part' + str(prep_count) +'.tsv',sep='\t',index=True,index_label='sample_name')
-            prep_count += 1          
-        
+            prep_count += 1
 
-def run_host_depletion(fastq_file_list,cpus=4,filter_db='/databases/bowtie/Human_phiX174',output_dir='./'):
+
+def run_host_depletion(fastq_file_list,filter_db='',cpus=4,output_dir='./',method='bowtie2'):
+    db_dict = {'bowtie2':'/databases/bowtie/Human_phiX174/Human_phix174',
+                'minimap2':'/databases/minimap2/human-phix-db.mmi'
+              }
+    if filter_db == '':
+        filter_db = db_dict[method]
+
+    read1_fastq=str(fastq_file_list[0])
+    filtered_fastq_1=read1_fastq.replace('.fastq.gz','.R1.filtered')
+
+    if len(fastq_file_list) == 2:
+        read2_fastq=str(fastq_file_list[1])
+    else:
+        read2_fastq = '' #to reduce code complexity for checking for paired vs unpaired, dummy file string here
+
+    filtered_fastq_2=read2_fastq.replace('.fastq.gz','.R2.filtered')
+
+    if method == 'bowtie2':
+        bowtie2_args=['bowtie2', '-p', str(cpus), '-x', filter_db]
+        stv_args_1 =['samtools', 'view', '-f', '12', '-F', '256']
+        sts_args =['samtools', 'sort', '-@', str(cpus),'-n']
+        stv_args_2 = ['samtools', 'view','-bS']
+        btb_args = ['bedtools', 'bamtofastq', '-i', '-', '-fq', filtered_fastq_1]
+
         if len(fastq_file_list) == 2:
-            subprocess.run(['bowtie2', '-p', cpus, '-x', filter_db, '-1',fastq_file_list[0], '-2', fastq_file_list[1],
-                 '--very-sensitive', '|', 'samtools', 'view', '-f', '12', '-F', '256', '|', 'samtools', 'sort', '-@', '16','-n', '|',
-                 'samtools', 'view','-bS', '|', 'bedtools', 'bamtofastq', '-i', '-', '-fq', fastq_file_list[0].replace('.fastq.gz','R1.filtered'),
-                 '-fq2', fastq_file_list[1].replace('.fastq.gz','R2.filtered')])
-            subprocess.run(['gzip', fastq_file_list[0].replace('.fastq.gz','R1.filtered.fastq.gz')])
-            subprocess.run(['gzip', fastq_file_list[1].replace('.fastq.gz','R2.filtered.fastq.gz')])
-            subprocess.run(['rm', fastq_file_list[0]])
-            subprocess.run(['rm', fastq_file_list[1]])
-        else: #since we checked for >2 files before entering this loop, assume 1, i.e. forward only
-            subprocess.run(['bowtie2', '-p', cpus, '-x', filter_db, '-1',fastq_file_list[0],'--very-sensitive', '|', 'samtools', 'view', '-f', '12',
-                 '-F', '256', '|', 'samtools', 'sort', '-@', '16','-n', '|','samtools', 'view','-bS', '|', 'bedtools', 'bamtofastq', '-i', '-', '-fq',
-                 fastq_file_list[0].replace('.fastq.gz','R1.filtered')])
-            subprocess.run(['gzip', fastq_file_list[0].replace('.fastq.gz','R1.filtered.fastq.gz')])
-            subprocess.run(['rm', fastq_file_list[0]])
+            bowtie2_args=bowtie2_args + ['-1',read1_fastq,'-2',read2_fastq]
+            btb_args = btb_args + ['-fq2',filtered_fastq_2]
+        else:
+            bowtie2_args=bowtie2_args + ['-U',read1_fastq]
 
-def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
+        bowtie2_args.append('--fast-local')
+
+        #now run bowtie2 commands in chain
+        bt2_ps = subprocess.Popen(bowtie2_args, stdout=subprocess.PIPE)
+        stv_ps1 = subprocess.Popen(stv_args_1,stdin=bt2_ps.stdout, stdout=subprocess.PIPE)
+        sts_ps = subprocess.Popen(sts_args,stdin=stv_ps1.stdout, stdout=subprocess.PIPE)
+        stv_ps2 = subprocess.Popen(stv_args_2,stdin=sts_ps.stdout, stdout=subprocess.PIPE)
+        btb_ps = subprocess.Popen(btb_args,stdin=stv_ps2.stdout, stdout=subprocess.PIPE)
+        btb_ps.wait()
+
+        if path.isfile(filtered_fastq_1):
+            subprocess.run(['gzip', filtered_fastq_1])
+            subprocess.run(['rm', read1_fastq])
+        if path.isfile(filtered_fastq_2):
+            subprocess.run(['gzip', filtered_fastq_2])
+            subprocess.run(['rm', read2_fastq])
+
+    elif method == 'minimap2':
+
+        output_fastq1=filtered_fastq_1 + '.gz'
+        fastp_args=['fastp','-l','100','-i', read1_fastq]
+        minimap2_args = ['minimap2','-ax', 'sr', '-t', str(cpus), filter_db,"-","-a"]
+        stf_args=['samtools','fastq', '-@', str(cpus), '-f', '12', '-F', '256', '-1',output_fastq1]
+
+        if len(fastq_file_list)==2:
+            fastp_args = fastp_args + ['-I',read2_fastq]
+            output_fastq2 =filtered_fastq_2 + '.gz'
+            stf_args= stf_args+ ['-2',output_fastq2]
+
+        #add final flags for fastp after determining input file count
+        fastp_args = fastp_args + ['-w',str(cpus),'--stdout']
+
+        fastp_ps = subprocess.Popen(fastp_args, stdout=subprocess.PIPE)
+        minimap2_ps = subprocess.Popen(minimap2_args,stdin=fastp_ps.stdout, stdout=subprocess.PIPE)
+        stf_ps = subprocess.Popen(stf_args,stdin=minimap2_ps.stdout, stdout=subprocess.PIPE)
+        stf_ps.wait()
+
+        #logger.warning("minimap2 not yet supported. Skipping host depletion.")
+    else:
+        logger.warning("Selected depletion method '" + method + "' not currently supported. Please select either bowtie2 or minimap2.")
+
+def fetch_sequencing_data(download_df,output_dir="./",mode='ebi',host_deplete=False,host_db='/databases/bowtie/Human_phiX174/Human_phiX174',cpus=4):
     """Fetch all the meta file(s) for EBI study
 
     Parameters
@@ -574,17 +745,21 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
                 else:
                     urlretrieve("ftp://" +f, fq_path)
 
+            valid_hd_prep_types = ['WGS','WGA','WXS','ChIP-Seq','RNA-Seq']
             if host_deplete:
                 if len(hd_file_list) > 2:
                     logger.warning("More than 2 files in the fastq download path. Skipping host depletion for "
                          + row['sample_name'])
                 else:
-                    if row['library_strategy']:
+                    if row['library_strategy'] in valid_hd_prep_types:
                         logger.info("Running host depletion on " + row['sample_name'])
-                        run_host_depletion(hd_file_list)
+                        run_host_depletion(hd_file_list,host_db,cpus,output_dir)
+                    elif force_hd:
+                        logger.warning("Forcing host depletion for " + + " with library_strategy " + + ". This may break...")
+                        run_host_depletion(hd_file_list,host_db,cpus,output_dir)
                     else:
-                        logger.info("Skipping host depletion for " + row['sample_name'] + " Library Strategy is "
-                                     + row['library_strategy'] + " not WGS")
+                        logger.warning("Skipping host depletion for " + row['sample_name'] + " Library Strategy is "
+                                     + row['library_strategy'] + ". Valid formats are: "+ str(valid_hd_prep_types))
         elif mode =='sra':
             subprocess.run(['fastq-dump', '-I', '--split-files', '--gzip', '--outdir', output_dir, row['run_accession']])
             #TODO implement host depletion for sra
@@ -592,6 +767,7 @@ def fetch_sequencing_data(download_df,output_dir="./",mode='ebi'):
             raise Exception(mode + " is not a valid repository")
 
 
+### END of methods ###
 
 if __name__ == '__main__':
     # parse the flags and initialize output file names
@@ -623,23 +799,27 @@ if __name__ == '__main__':
                                                        'DNase-Hypersensitivity','Bisulfite-Seq','EST',
                                                        'FL-cDNA','miRNA-Seq','ncRNA-Seq','FINISHING',
                                                        'TS','Tn-Seq','VALIDATION','FAIRE-seq','SELEX',
-                                                       'RIP-Seq','ChIA-PET','RAD-Seq'],
+                                                       'RIP-Seq','ChIA-PET','RAD-Seq','Other'],
                         help="list of one or more libary strategies to restrict sample selection.")
     parser.add_argument("-plat", "--platforms", nargs='*', choices=['LS454','Illumina','Ion Torrent','PacBio_SMRT','OXFORD_NANOPORE'],
                         help="List of one or more platforms to restrict sample selection.")
     parser.add_argument("-name","--scientific_names",nargs='*',help="List of scientific_names to restrict for selection.")
     parser.add_argument("-yaml","--validators",nargs='*', help="one or more yaml files in QIIMP format for validation.")
-    parser.add_argument("-yaml-dir","--yaml_dir", default ='./', help="one or more yaml files in QIIMP format for validation.")
+    parser.add_argument("-yaml-dir","--yaml_dir", default ='./', help="One or more yaml files in QIIMP format for validation. Loads yml files in ./ by default.")
     parser.add_argument("-no-seqs", "--no_seqs", default=False,action='store_true', help="Omit download of fastq files.")
     parser.add_argument("-v", "--verbose", default=False, action='store_true', help="Output additional messages.")
-    parser.add_argument("-log", "--log", default='./output.log',help="filename for logger.")
+    parser.add_argument("-log", "--log",default='./output.log',help="filename for logger. Defaults to [output_dir]/[ProjectID]_output.log")
     parser.add_argument("-prep-max","--prep_max",type=int, default=10000,help="Max number of samples per prep info file.")
-    parser.add_argument("-f","--force",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
-    parser.add_argument("-hd","--host_deplete",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
-    parser.add_argument("-p","--cpus",type=int, default=4,help="Max number of samples per prep info file.")
+    parser.add_argument("-f","--force_yaml",default=False, action='store_true', help="Advanced: force use of specified yaml for validation.")
+    parser.add_argument("-hd","--host_deplete",default=False, action='store_true', help="Advanced: host deplete using bowtie2. Uses human_PhiX db on barnacle by default.")
+    parser.add_argument("-db","--host_db",default='/databases/bowtie/Human_phiX174/Human_phix174', help="Advanced: specify the path to the host database for depletion.")
+    parser.add_argument("-p","--cpus",type=int, default=4,help="Number of processors to use during host depletion. Default is 4.")
+    parser.add_argument("-fhd","--force_host_depletion",default=False, action='store_true', help="Advanced: force host depletion for non-supported libary strategies. May break.")
+    parser.add_argument("-map","--empo_mapping",help="Advanced: .tsv with sample_type to EMPO mappings to use for normalization. Should contain the following columns: [sample_type, simple_sample_type, empo_1, empo_2,empo_3]")
+    parser.add_argument("-method","--depletion_method",default='bowtie2',help="Advanced: set host depletion method. bowtie2 by default. TODO implement minimap2 as second option.")
 
     args = parser.parse_args()
-    
+
     if args.project is None:
         logger.warning("""
                 python EBI_SRA_Downloader.py -project [accession] [accession ... N]
@@ -665,25 +845,31 @@ if __name__ == '__main__':
         mode=args.mode
         DEBUG = args.verbose
         omit_seqs = args.no_seqs
-        force = args.force
+        force = args.force_yaml
         max_prep =args.prep_max
         host_deplete = args.host_deplete
-                
-        fh=logging.FileHandler(args.log)
-        logger.addHandler(fh)
+        host_db = args.host_db
+        proc= args.cpus
+        force_hd = args.force_host_depletion
+        hd_method=args.depletion_method
+
+        if args.log is not None:
+            fh=logging.FileHandler(args.log)
+            logger.addHandler(fh)
+
         if DEBUG: logger.setLevel(logging.INFO)
-   
+
         # Output directory
         output = args.output
         if not path.exists(output):
             makedirs(output)
         if list(output)[-1] != '/':
             output = output + '/'
-        
+
         #set up validators
         yaml_validator_dict = {}
         yaml_list =  []
-        
+
         if args.validators is not None:
             for y in args.validators:
                 yaml_list.append(y)
@@ -691,8 +877,8 @@ if __name__ == '__main__':
             for file in os.listdir(args.yaml_dir):
                 if file.endswith(".yml") or file.endswith(".yaml"):
                     yaml_list.append(os.path.join(args.yaml_dir, file))
-        
-        #since we're provding a way to override parsing, check assumption that a single validator is being passed
+
+        #since we're providing a way to override parsing, check assumption that a single validator is being passed
         if force:
             if len(yaml_list) > 1:
                 raise Exception("Error: more than one yaml supplied with 'force' mode. Please supply only one yaml file." +\
@@ -703,28 +889,33 @@ if __name__ == '__main__':
             else:
                 yaml_validator_dict = yaml_list
         else:
-            yaml_validator_dict = add_yaml_validators(yaml_list)
-                       
+            yaml_validator_dict = set_yaml_validators(yaml_list)
+
+        if args.empo_mapping is not None:
+            empo_mapping_dict = set_empo_normalizers(args.empo_mapping)
+        else:
+            empo_mapping_dict = {}
+
         platforms=[]
         if args.platforms is not None:
             for p in args.platforms:
                 platforms.append(p.lower())
-        
+
         strategies =[]
         if args.strategies is not None:
             for s in args.strategies:
                 strategies.append(s.lower())
-        
+
         names=[]
         if args.scientific_names is not None:
             for n in args.scientific_names:
                 names.append(n.lower())
-                
+
         sources=[]
         if args.sources is not None:
             for c in args.sources:
                 sources.append(c.lower())
-        
+
         # Retreive study information
         p_count=0
         for p in args.project:
@@ -738,13 +929,18 @@ if __name__ == '__main__':
             else:
                 file_prefix = output + p
             p_count +=1    
+
             study = get_study_details(p,mode,file_prefix)
-            
+
             #tidy metadata
-            md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names,sources)
-            
-            #write out files            
+            md=get_sample_info(study,mode,platforms,strategies,yaml_validator_dict,file_prefix,names,sources,empo_mapping_dict)
+
+            #write out files
             write_info_files(md,max_prep,file_prefix)
-            
+            logger.info(host_db)
             if not omit_seqs:
-                fetch_sequencing_data(md,output,mode)
+                fetch_sequencing_data(md,output,mode,host_deplete,host_db,proc)
+
+            #kludge to handle output log for now
+            if path.isfile('./output.log'):
+                shutil.move('./output.log',file_prefix + '_output.log')
