@@ -2,15 +2,15 @@
 # conda command to install all dependencies:
 #   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools xmltodict lxml pyyaml xlrd -c bioconda -c conda-forge -y
 # to enable host depletion use:
-#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools bowtie2 samtools bedtools xmltodict lxml pyyaml xlrd -c bioconda -c conda-forge -y
+#   conda create -n ebi_sra_importer pandas requests entrez-direct sra-tools bowtie2 minimap2 samtools bedtools xmltodict lxml pyyaml xlrd -c bioconda -c conda-forge -y
 # or to enable later after installation:
 #   conda activate ebi_sra_importer
-#   conda install bowtie2 samtools bedtools
+#   conda install bowtie2 minimap2 samtools bedtools
 #
 # pip command to install all dependencies:
 #   pip install csv glob requests subprocess xmltodict sys lxml os urllib pyyaml xlrd
 #   pip install argparse pandas bioconda sra-tools entrez-direct
-#   pip install bowtie2 samtools bedtools
+#   pip install bowtie2 minimap2 samtools bedtools
 #
 # Instruction:
 #       python EBI_SRA_Downloader.py -project [accession] [accession ... N]
@@ -321,7 +321,7 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
     if not path.isfile(pre_validation_file):
         if mode =='ebi':
             identifier = 'secondary_sample_accession'
-            run_accession = 'run_accession'        
+            run_accession = 'run_accession'
             input_df['platform']=input_df['instrument_platform']
         elif mode == 'sra':
             identifier = 'sample'
@@ -341,34 +341,46 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
             except_msg = except_msg + "Selected Platforms: " + str(plat) + "\n Available Platforms:" +\
                         str(input_df['platform'].str.lower().unique()) + "\n"
             input_df = input_df[input_df['platform'].str.lower().isin(plat)]
-            
+
         if len(strat) > 0:
             except_msg = except_msg + "Selected Strategies: " + str(strat) + "\n Available Strategies:" +\
                         str(input_df['library_strategy'].str.lower().unique()) + "\n"
             input_df = input_df[input_df['library_strategy'].str.lower().isin(strat)]
-            
+
         if len(names) > 0:
             except_msg = except_msg + "Selected Scientific Names: " + str(names) + "\n Available Scientific Names:" +\
                         str(input_df['scientific_name'].str.lower().unique()) + "\n"
             input_df = input_df[input_df['scientific_name'].str.lower().isin(names)]
-        
+
         if len(src) > 0:
             except_msg = except_msg + "Selected Library Sources: " + str(src) + "\n Available Library Sources:" +\
                         str(input_df['library_source'].str.lower().unique()) + "\n"
             input_df = input_df[input_df['library_source'].str.lower().isin(src)]
-        
+
         if len(input_df) == 0:
             raise Exception("No files after selection criteria:\n" + except_msg)
-        
+
+        #need to catch common issue where identifier is identical for unique samples
+        #for now assume that in this case, libarary_name will be unique, and if it isn't combine sample and run names
+        if len(input_df) > 1 and input_df[identifier].nunique() == 1:
+            if input_df['library_name'].nunique() != 1:
+                 #print(str(len(_input_df)) + " is length and input_df[identifier].nunique() = " + str(input_df[identifier].nunique()))
+                 input_df['sample_name']=input_df['library_name'].apply(lambda x: scrub_special_chars(x))
+            else:
+                 input_df['sample_name']=input_df[identifier]+ '.' + input_df[run_accession]
+
+        input_df['run_prefix']=input_df[run_accession]
+
         for index, row in input_df.iterrows():
             sample_accession = row[identifier]
             prep_type = row['library_strategy']
+            sample_name = row['sample_name']
             if prep_type not in sample_count_dict.keys() :
-                sample_count_dict[prep_type]= {sample_accession:0}
-            elif sample_accession not in sample_count_dict[prep_type].keys():
-                sample_count_dict[prep_type][sample_accession]= 0
+                sample_count_dict[prep_type]= {sample_name:0}
+            elif sample_name not in sample_count_dict[prep_type].keys():
+                sample_count_dict[prep_type][sample_name]= 0
             else:
-                sample_count_dict[prep_type][sample_accession] = sample_count_dict[prep_type][sample_accession] + 1
+                sample_count_dict[prep_type][sample_name] = sample_count_dict[prep_type][sample_name] + 1
 
             sampleUrl = "http://www.ebi.ac.uk/ena/data/view/" + sample_accession \
                     + "&display=xml"
@@ -395,29 +407,15 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
                     except:
                         logger.warning('No value found for sample attribute: ' + col + '. Setting to "not provided".')
                         input_df.at[index,col]='not provided'
-                input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_accession])
+                input_df.at[index,'prep_file']=prep_type + '_' + str(sample_count_dict[prep_type][sample_name])
             else:
                 logger.warning('No metadata found for sample named: ' + sample_accession + ' omitting.')
-        #set sample_name based on identifier column
-        input_df['sample_name']=input_df[identifier]
-
-        #need to catch common issue where identifier is identical for unique samples
-        #for now assume that in this case, libarary_name will be unique, and if it isn't combined sample and run names
-
-        if len(input_df) > 1 and input_df[identifier].nunique() == 1:
-            if input_df['library_name'].nunique() != 1:
-                #print(str(len(_input_df)) + " is length and input_df[identifier].nunique() = " + str(input_df[identifier].nunique()))
-                input_df['sample_name']=input_df['library_name'].apply(lambda x: scrub_special_chars(x))
-            else:
-                input_df['sample_name']=input_df[identifier]+ '.' + input_df[run_accession]
-
-        input_df['run_prefix']=input_df[run_accession]
 
         #the loop above takes the most time so write out a placeholder file for faster re-running if interrupted
         input_df.to_csv(pre_validation_file,sep='\t',index=False)    
     else:
         input_df = pd.read_csv(pre_validation_file,sep='\t',dtype=str)
-    
+
     #start by normalizing sample types and EMPO fields if sample_type is present
     if len(empo_mapping) > 0:
         if 'sample_type' in input_df.columns:
@@ -426,6 +424,7 @@ def get_sample_info(input_df,mode='ebi',plat=[],strat=[],validator_files={},pref
             logger.warning("'sample_type' not found in metadata. Skipping EMPO normalization.")
 
     output_df=validate_samples(input_df,sample_type_column,validator_files,prefix)
+
     #tidy output before returning
     output_df.columns = [scrub_special_chars(col).lower() for col in output_df.columns]
 
@@ -616,10 +615,11 @@ def write_info_files(final_df,max_prep,prefix=''):
 
     prep_info_columns = ['sample_name'] + prep_info_columns #add to list for writing out prep files
     for prep_file in final_df['prep_file'].unique():
+        logger.info(prep_file.split('_')[0])
         prep_df = final_df[final_df['prep_file']==prep_file]
-        if prep_file in amplicon_type_preps: #check to see if the prep is amplicon-style, specified by list above
+        if prep_file.split('_')[0] in amplicon_type_preps: #check to see if the prep is amplicon-style, specified by list above
             for min_prep in amplicon_min_prep_list: #if amplicon-style, enforce presence or null values for minimum prep info information
-                if min_prep not in prep_df.columns():
+                if min_prep not in prep_df.columns:
                     prep_df[min_prep]='XXEBIXX' #will throw warning, but okay with current pandas
         prep_df= prep_df[prep_df.columns[prep_df.columns.isin(prep_info_columns)]].set_index('sample_name')
         prep_df=prep_df.dropna(axis=1,how='all')
@@ -647,7 +647,13 @@ def run_host_depletion(fastq_file_list,filter_db='',cpus=4,output_dir='./',metho
 
     filtered_fastq_2=read2_fastq.replace('.fastq.gz','.R2.filtered')
 
-    if method == 'bowtie2':
+    #run some checks to help wtih resumed runs
+    skip = False 
+    skip = path.isfile(filtered_fastq_1)
+    if filtered_fastq_2 != '':
+        skip = path.isfile(filtered_fastq_2)
+
+    if method == 'bowtie2' and not skip:
         bowtie2_args=['bowtie2', '-p', str(cpus), '-x', filter_db]
         stv_args_1 =['samtools', 'view', '-f', '12', '-F', '256']
         sts_args =['samtools', 'sort', '-@', str(cpus),'-n']
@@ -677,7 +683,7 @@ def run_host_depletion(fastq_file_list,filter_db='',cpus=4,output_dir='./',metho
             subprocess.run(['gzip', filtered_fastq_2])
             subprocess.run(['rm', read2_fastq])
 
-    elif method == 'minimap2':
+    elif method == 'minimap2' and not skip:
 
         output_fastq1=filtered_fastq_1 + '.gz'
         fastp_args=['fastp','-l','100','-i', read1_fastq]
@@ -698,6 +704,8 @@ def run_host_depletion(fastq_file_list,filter_db='',cpus=4,output_dir='./',metho
         stf_ps.wait()
 
         #logger.warning("minimap2 not yet supported. Skipping host depletion.")
+    elif skip:
+        logger.warning("All filtered files found for " + read1_fastq.replace('.fastq.gz','').split('/')[-1] + ". Skipping host depletion.") 
     else:
         logger.warning("Selected depletion method '" + method + "' not currently supported. Please select either bowtie2 or minimap2.")
 
