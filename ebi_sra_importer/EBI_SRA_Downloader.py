@@ -1569,7 +1569,7 @@ if __name__ == '__main__':
                         "repository to be queried.", choices=['ebi','sra'])
     parser.add_argument("-prefix", "--prefix", nargs='*',
                         help="prefix(es) to prepend to output info files")
-    parser.add_argument("-src","--sources",nargs='*',choices=['GENOMIC','GENOMIC SINGLE CELL':'TRANSCRIPTOMIC',
+    parser.add_argument("-src","--sources",nargs='*',choices=['GENOMIC','GENOMIC SINGLE CELL','TRANSCRIPTOMIC',
                                                               'TRANSCRIPTOMIC SINGLE CELL','METAGENOMIC',
                                                               'METATRANSCRIPTOMIC','SYNTHETIC','VIRAL RNA','OTHER'],
                         help="list of one or more sources for restricting sample selection.")
