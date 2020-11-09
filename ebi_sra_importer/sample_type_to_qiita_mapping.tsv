@@ -1,0 +1,467 @@
+sample_type	sample count	simple_sample_type	empo_1	empo_2	empo_3			
+abdominal	120	bodily fluid	Host-associated	Animal	Animal corpus			
+ab_liq	70	bodily fluid	Host-associated	Animal	Animal corpus			
+ab_reswab	20	bodily fluid	Host-associated	Animal	Animal corpus			
+ab_swab	20	bodily fluid	Host-associated	Animal	Animal corpus			
+air	85	air	Free-living	Non-saline	Aerosol (non-saline)			
+alfalfa surface	12	plant	Host-associated	Plant	Plant surface			
+Algal	10	algal biofilm	Host-associated	Plant	Plant surface			
+algal tissue	1	plant	Host-associated	Plant	Plant corpus			
+Amphimedon erina	5	sponge	Host-associated	Animal	Animal corpus			
+anal swab		anal swab	Host-associated	Animal-associated	Animal distal gut			
+anaerobic reactor biomass	23	anaerobic digester content	Host-associated	Animal-associated	Animal distal gut			
+Ancorina alata	12	sponge	Host-associated	Animal	Animal corpus			
+Animal distal gut	48	fecal	Host-associated	Animal	Animal distal gut			
+Animal secretion	57	saliva	Host-associated	Animal	Animal secretion			
+Animal surface	61	skin	Host-associated	Animal	Animal corpus			
+Aplysina aerophoba	16	sponge	Host-associated	Animal	Animal corpus			
+Aplysina archeri	6	sponge	Host-associated	Animal	Animal corpus			
+Aplysina cavernicola	6	sponge	Host-associated	Animal	Animal corpus			
+apple surface	24	food product	Host-associated	Plant	Plant corpus			
+arterial plaque	14	arterial plaque	Host-associated	Animal	Animal corpus			
+Axilla	277	skin	Host-associated	Animal	Animal secretion			
+Axinella infundibuliformis	12	sponge	Host-associated	Animal	Animal corpus			
+Axinella sp.	6	sponge	Host-associated	Animal	Animal corpus			
+bacteria monoculture		control positive	Control	Positive	Single strain			
+beach sand	96	beach sand	Free-living	Non-saline	Soil (non-saline)			
+beauty product	4	anthropogenic material	Free-living	Non-saline	Surface (non-saline)			
+Bedrail	650	surface	Free-living	Non-saline	Surface (non-saline)			
+bee intestine with content	158	insect	Host-associated	Animal	Animal distal gut			
+bee larva	36	insect	Host-associated	Animal	Animal corpus			
+bee pupa	36	insect	Host-associated	Animal	Animal corpus			
+beer-associated microbial community	14	food product	Free-living	Non-saline	Surface (non-saline)			
+belly	86	skin	Host-associated	Animal	Animal surface			
+belly_reswab	20	skin	Host-associated	Animal	Animal surface			
+Biemna ehrenbergi	4	sponge	Host-associated	Animal	Animal corpus			
+bile	1	secretion	Host-associated	Animal	Animal secretion			
+biofilm	572	biofilm	Free-living	Non-saline	Surface (non-saline)			
+Biofilm	3	biofilm	Free-living	Non-saline	Surface (non-saline)			
+biopsy	1075	body tissue	Host-associated	Animal	Animal corpus			
+bioreactor content		anaerobic digester content	Host-associated	Animal	Animal distal gut			
+bird egg shell	1179	bird egg	Host-associated	Animal	Animal corpus			
+bison feces	3	stool	Host-associated	Animal	Animal distal gut			
+black-ball sponge	27	sponge	Host-associated	Animal	Animal corpus			
+blank control	324	control blank	Control	Negative	Sterile water blank			
+BLANK.JS6.12E	1	control blank	Control	Negative	Sterile water blank			
+BLANK.JS6.12F	1	control blank	Control	Negative	Sterile water blank			
+BLANK.JS6.12G	1	control blank	Control	Negative	Sterile water blank			
+BLANK.JS6.12H	1	control blank	Control	Negative	Sterile water blank			
+blended silo milk	161	milk	Host-associated	Animal	Animal secretion			
+Blue Haliclona	7	sponge	Host-associated	Animal	Animal corpus			
+Blue Ircinia	12	sponge	Host-associated	Animal	Animal corpus			
+bodily fluid	140	bodily fluid	Host-associated	Animal	Animal corpus			
+brackish water	48	brackish water	Free-living	Saline	Water (saline)			
+Branching tube sponge	5	sponge	Host-associated	Animal	Animal corpus			
+breast milk	80	milk	Host-associated	Animal	Animal secretion			
+broken well	1	broken well in pcr plate	Free-living	Non-saline	Surface (non-saline)			
+brown encrusting octopus sponge	5	sponge	Host-associated	Animal	Animal corpus			
+Built environment sample	409	surface	Free-living	Non-saline	Surface (non-saline)			
+Bulk water	295	water	Free-living	Non-saline	Water (non-saline)			
+Callyspongia	6	sponge	Host-associated	Animal	Animal corpus			
+carbonate deposit from alkaline spring	43	sediment	Free-living	Non-saline	Sediment (non-saline)			
+carcass	2	carcass	Host-associated	Animal	Animal corpus			
+Carteriospongia foliascens	115	sponge	Host-associated	Animal	Animal corpus			
+cecal	33	cecum content	Host-associated	Animal	Animal distal gut			
+Cecal	106	cecum content	Host-associated	Animal	Animal distal gut			
+cecal content	121	cecum content	Host-associated	Animal	Animal distal gut			
+cecal digesta	141	cecum content	Host-associated	Animal	Animal distal gut			
+cecum	91	cecum content	Host-associated	Animal	Animal distal gut			
+Cecum		cecum content	Host-associated	Animal	Animal distal gut			
+cecum content	14	cecum content	Host-associated	Animal	Animal distal gut			
+cecum mucosa	16	cecum mucosa	Host-associated	Animal	Animal distal gut			
+Chair Armrest	109	surface	Free-living	Non-saline	Surface (non-saline)			
+Chalinula molibta	5	sponge	Host-associated	Animal	Animal corpus			
+cheese		food product	Free-living	Non-saline	Surface (non-saline)			
+chicken liver sponge	5	sponge	Host-associated	Animal	Animal corpus			
+Chondrilla australiensis	6	sponge	Host-associated	Animal	Animal corpus			
+Cinachyra sp.	16	sponge	Host-associated	Animal	Animal corpus			
+Cinachyrella	6	sponge	Host-associated	Animal	Animal corpus			
+Clathrina sp.	6	sponge	Host-associated	Animal	Animal corpus			
+Cliona celata complex	14	sponge	Host-associated	Animal	Animal corpus			
+Cliona viridis	8	sponge	Host-associated	Animal	Animal corpus			
+coastal water	35	sea water	Free-living	Saline	Water (saline)			
+Coelocarteria singaporensis	16	sponge	Host-associated	Animal	Animal corpus			
+Cold Tap Faucet Handle	635	surface	Free-living	Non-saline	Surface (non-saline)			
+Cold Tap Water	263	water	Free-living	Non-saline	Water (non-saline)			
+Cold Tap Water Faucet Handle	32	surface	Free-living	Non-saline	Surface (non-saline)			
+colon	1	colon content	Host-associated	Animal	Animal distal gut			
+Colon	42	colon content	Host-associated	Animal	Animal distal gut			
+colon content	25	colon content	Host-associated	Animal	Animal distal gut			
+colon hartmann	3	colon content	Host-associated	Animal	Animal distal gut			
+colon mucosa		colon mucosa	Host-associated	Animal	Animal distal gut			
+colon mucous fistula	8	colon content	Host-associated	Animal	Animal distal gut			
+colostomy	12	colon content	Host-associated	Animal	Animal distal gut			
+colostrum	4	colostrum	Host-associated	Animal	Animal secretion			
+common bile duct mucosa	1	body tissue	Host-associated	Animal	Animal corpus			
+computer mouse	10	surface	Free-living	Non-saline	Surface (non-saline)			
+Computer Mouse	102	surface	Free-living	Non-saline	Surface (non-saline)			
+control blank DNA extraction		control blank	Control	Negative	Sterile water blank			
+control empty		control empty	Control	Negative	Sterile water blank			
+control positive		control positive	Control	Positive	Mock community			
+control	234	control blank	Control	Negative	Sterile water blank			
+control bench paper	2	control bench paper	Control	Positive	Sterile water blank	Negative		
+control blank	3223	control blank	Control	Negative	Sterile water blank	Positive		
+control di water	3	control water	Control	Negative	Sterile water blank			
+control EtOH	1	control ethanol	Control	Positive	Sterile water blank			
+control extraction	2	control blank	Control	Negative	Sterile water blank			
+control mock	2	control positive	Control	Positive	Mock community			
+control negative	20	control blank	Control	Negative	Sterile water blank			
+control ntc	3	control blank	Control	Negative	Sterile water blank			
+control purification	2	control blank	Control	Negative	Sterile water blank			
+control swab	2	control blank	Control	Negative	Sterile water blank			
+Coral	37	coral	Host-associated	Animal	Animal corpus			
+coral		coral	Host-associated	Animal	Animal corpus			
+Coral-algal interface	12	coral	Host-associated	Animal	Animal corpus			
+Corridor Floor	106	surface	Free-living	Non-saline	Surface (non-saline)			
+Coral mucus		coral mucus	Host-associated	Animal	Animal surface			
+Coscinoderma matthewsi	31	sponge	Host-associated	Animal	Animal corpus			
+Countertop	107	surface	Free-living	Non-saline	Surface (non-saline)			
+cream	8	milk	Host-associated	Animal	Animal secretion			
+Crop	16	body tissue	Host-associated	Animal	Animal proximal gut			
+crop digesta	23	crop content	Host-associated	Animal	Animal proximal gut			
+culture	3	bacterial culture	Control	Positive	Single strain			
+Cymbastela	6	sponge	Host-associated	Animal	Animal corpus			
+Cymbastela coralliophila	6	sponge	Host-associated	Animal	Animal corpus			
+Cymbastella coralliophilla	8	sponge	Host-associated	Animal	Animal corpus			
+dental plaque	289	oral	Host-associated	Animal	Animal secretion			
+dissected ant abdomen	99	insect	Host-associated	Animal	Animal corpus			
+dissected ant gut	291	insect	Host-associated	Animal	Animal distal gut			
+distal colon (likely aganglionic)	1	colon mucosa	Host-associated	Animal	Animal distal gut			
+Door in	12	surface	Free-living	Non-saline	Surface (non-saline)			
+Door out	12	surface	Free-living	Non-saline	Surface (non-saline)			
+drinking_water_bulk_water		water	Free-living	Non-saline	Water (non-saline)			
+Dry_Stool	140	stool	Host-associated	Animal	Animal distal gut			
+duodenal digesta	20	duodenum content	Host-associated	Animal	Animal proximal gut			
+duodenal mucosa	13	duodenum mucosa	Host-associated	Animal	Animal corpus			
+dust	4658	dust	Free-living	Non-saline	Surface (non-saline)			
+Dust	360	dust	Free-living	Non-saline	Surface (non-saline)			
+Dysidea avara	10	sponge	Host-associated	Animal	Animal corpus			
+Dysidea fragilis	6	sponge	Host-associated	Animal	Animal corpus			
+Ear wax	44	cerumen/ear wax	Host-associated	Animal	Animal secretion			
+echinoderm tissue	1	insect	Host-associated	Animal	Animal secretion			
+egg	627	egg	Host-associated	Animal	Animal corpus			
+empty control	694	control blank	Control	Negative	Sterile water blank			
+ENVO:fermented food product	6	food product	Free-living	Non-saline	Surface (non-saline)			
+erect rope sponge	13	sponge	Host-associated	Animal	Animal corpus			
+Erylus formosus	5	sponge	Host-associated	Animal	Animal corpus			
+estuary sediment	1	sediment	Free-living	Saline	Water (saline)			
+estuary water	3	estuary water	Free-living	Saline	Sediment (saline)			
+eutrophic water	62	eutrophic water	Free-living	Non-saline	Water (non-saline)			
+Expelled stool		stool	Host-associated	Animal	Animal distal gut			
+Faucet handles	12	surface	Free-living	Non-saline	Surface (non-saline)			
+fecal	75	stool	Host-associated	Animal	Animal distal gut			
+Fecal	710	stool	Host-associated	Animal	Animal distal gut			
+feces	436	stool	Host-associated	Animal	Animal distal gut			
+Feces	184	stool	Host-associated	Animal	Animal distal gut			
+feed	10	food product	Free-living	Non-saline	Surface (non-saline)			
+Fermented Food	19	fermented food product	Free-living	Non-saline	Surface (non-saline)			
+fermented food product	13	fermented food product	Free-living	Non-saline	Surface (non-saline)			
+filter	3	surface	Free-living	Non-saline	Surface (non-saline)			
+filtered water	77	water	Free-living	Non-saline	Water (non-saline)			
+filtration sand	923	filtration sand	Free-living	Non-saline	Soil (non-saline)			
+Fire sponge	5	sponge	Host-associated	Animal	Animal corpus			
+fish digesta		fish digesta	Host-associated	Animal	Animal distal gut			
+fish gill		fish gill	Host-associated	Animal	Animal corpus			
+fish gut		fish gut	Host-associated	Animal	Animal distal gut			
+fish pyloric caeca		fish pyloric caeca	Host-associated	Animal	Animal distal gut			
+fish skin		fish skin	Host-associated	Animal	Animal surface			
+fish gut mucosa	70	fish gut mucosa	Host-associated	Animal	Animal distal gut			
+Floor	841	surface	Free-living	Non-saline	Surface (non-saline)			
+Flowers	39	flower	Host-associated	Plant	Plant corpus			
+fly	78	insect	Host-associated	Animal	Animal corpus			
+Food product	68	food product	Free-living	Non-saline	Surface (non-saline)			
+Forehead	349	skin	Host-associated	Animal	Animal surface			
+fragment		surface	Free-living	Non-saline	Surface (non-saline)			
+freshwater	194	fresh water	Free-living	Non-saline	Water (non-saline)			
+fresh water	5713	fresh water	Free-living	Non-saline	Water (non-saline)			
+fresh water	100	fresh water	Free-living	Non-saline	Water (non-saline)			
+Fresh water	5	fresh water	Free-living	Non-saline	Water (non-saline)			
+freshwater metagenome	6	fresh water	Free-living	Non-saline	Water (non-saline)			
+fresh water sediment	1	freshwater sediment	Free-living	Non-saline	Sediment (non-saline)			
+freshwater sediment	170	freshwater sediment	Free-living	Non-saline	Sediment (non-saline)			
+freshwater sediment core	353	freshwater sediment	Free-living	Non-saline	Sediment (non-saline)			
+fruit fly body	156	insect	Host-associated	Animal	Animal corpus			
+gastric gland	1	body tissue	Host-associated	Animal	Animal proximal gut			
+gastric juice	82	bodily fluid	Host-associated	Animal	Animal proximal gut			
+gastric mucosa	3	gastric mucosa	Host-associated	Animal	Animal proximal gut			
+Geodia barretti	6	sponge	Host-associated	Animal	Animal corpus			
+giant barrel sponge	51	sponge	Host-associated	Animal	Animal corpus			
+gill tissue	3	body tissue	Host-associated	Animal	Animal corpus			
+Gizzard	36	body tissue	Host-associated	Animal	Animal corpus			
+gizzard digesta	21	gizzard content	Host-associated	Animal	Animal proximal gut			
+Glove from Glove Box	616	surface	Free-living	Non-saline	Surface (non-saline)			
+grapes	47	fruit	Host-associated	Plant	Plant corpus			
+Grapes	40	fruit	Host-associated	Plant	Plant corpus			
+grapes surface	20	fruit	Host-associated	Plant	Plant corpus			
+green finger sponge	5	sponge	Host-associated	Animal	Animal corpus			
+groundwater	38	groundwater	Free-living	Non-saline	Water (non-saline)			
+ground water	3	groundwater	Free-living	Non-saline	Water (non-saline)			
+groundwater metagenome	57	groundwater	Free-living	Non-saline	Water (non-saline)			
+gut	111	gut	Host-associated	Animal	Animal distal gut			
+Gut	24	gut	Host-associated	Animal	Animal distal gut			
+gut tissue	277	gut mucosa	Host-associated	Animal	Animal distal gut			
+gut sample		gut mucosa	Host-associated	Animal	Animal distal gut			
+Hair	18	hair	Host-associated	Animal	Animal corpus			
+Halichondria panicea	6	sponge	Host-associated	Animal	Animal corpus			
+Halichondria phakellioides	6	sponge	Host-associated	Animal	Animal corpus			
+Haliclona tubifera	5	sponge	Host-associated	Animal	Animal corpus			
+Haliclona vansoesti	4	sponge	Host-associated	Animal	Animal corpus			
+Hamigera sp.	4	sponge	Host-associated	Animal	Animal corpus			
+Hand	600	skin	Host-associated	Animal	Animal corpus			
+head of bee	158	insect	Host-associated	Animal	Animal corpus			
+Heavenly sponge	5	sponge	Host-associated	Animal	Animal corpus			
+Hippospongia	6	sponge	Host-associated	Animal	Animal corpus			
+Hospital Pager	266	surface	Free-living	Non-saline	Surface (non-saline)			
+Hot Tap Water	70	water	Free-living	Non-saline	Surface (non-saline)			
+Hot Tap Water Faucet Handle	30	surface	Free-living	Non-saline	Surface (non-saline)			
+HTST2 milk	8	milk	Host-associated	Animal	Animal secretion			
+HTST milk	32	milk	Host-associated	Animal	Animal secretion			
+Hydra vulgaris (AEP)	40	sponge	Host-associated	Animal	Animal corpus			
+hypersaline water	13	hypersaline water	Free-living	Saline	Water (saline)			
+Hyrtios altum	6	sponge	Host-associated	Animal	Animal corpus			
+Hyrtios erectus	6	sponge	Host-associated	Animal	Animal corpus			
+Hyrtios sp.	6	sponge	Host-associated	Animal	Animal corpus			
+Ianthella basta	46	sponge	Host-associated	Animal	Animal corpus			
+ileal	56	ileum content	Host-associated	Animal	Animal proximal gut			
+Ileal	24	ileum content	Host-associated	Animal	Animal proximal gut			
+ileal digesta	18	ileum content	Host-associated	Animal	Animal proximal gut			
+ileal mucosa	11	ileal mucosa	Host-associated	Animal	Animal proximal gut			
+ileostomy	5	ileum content	Host-associated	Animal	Animal proximal gut			
+ileum	5	ileum content	Host-associated	Animal	Animal proximal gut			
+ileum content	64	ileum content	Host-associated	Animal	Animal proximal gut			
+ileum hartmann	4	ileum content	Host-associated	Animal	Animal proximal gut			
+Ileum		ileum content	Host-associated	Animal	Animal proximal gut			
+Indoor Surface	10	surface	Free-living	Non-saline	Surface (non-saline)			
+Inguinal Fold	28	body tissue	Host-associated	Animal	Animal corpus			
+in_mouth_reswab	20	oral	Host-associated	Animal	Animal secretion			
+inoculum	6	inoculum	Free-living	Non-saline	Surface (non-saline)			
+Inoculum	2	inoculum	Free-living	Non-saline	Surface (non-saline)			
+insect	190	insect	Host-associated	Animal	Animal corpus			
+Iotrochota	3	sponge	Host-associated	Animal	Animal corpus			
+Iotrochota sp.	6	sponge	Host-associated	Animal	Animal corpus			
+Ircinia felix	6	sponge	Host-associated	Animal	Animal corpus			
+Ircinia gigantea	6	sponge	Host-associated	Animal	Animal corpus			
+Ircinia sp.	6	sponge	Host-associated	Animal	Animal corpus			
+Ircinia variabilis	6	sponge	Host-associated	Animal	Animal proximal gut			
+jejunal digesta	16	jejunum content	Host-associated	Animal	Animal proximal gut			
+jejunal mucosa	17	jejunum mucosa	Host-associated	Animal	Animal proximal gut			
+jejunostomy	1	jejunum content	Host-associated	Animal	Animal proximal gut			
+jejunum	2	jejunum content	Host-associated	Animal	Animal proximal gut			
+kelp mucus	1652	kelp biofilm	Host-associated	Plant	Plant surface			
+lab equipment	54	surface	Free-living	Non-saline	Surface (non-saline)			
+lake sediment	50	sediment	Free-living	Non-saline	Sediment (non-saline)			
+Lavender rope sponge	5	sponge	Host-associated	Animal	Animal corpus			
+leaf litter	120	leaf litter	Host-associated	Plant	Plant corpus			
+leaves	49	leaves	Host-associated	Plant	Plant corpus			
+Leaves	75	leaves	Host-associated	Plant	Plant corpus			
+Left Hand	191	skin	Host-associated	Animal	Animal surface			
+Left leg	45	skin	Host-associated	Animal	Animal surface			
+lettuce surface	20	food product	Host-associated	Plant	Plant surface			
+lichen	16	lichen	Host-associated	Animal	Animal surface			
+Lissodendoryx colombiensis	5	sponge	Host-associated	Animal	Animal corpus			
+Lower intestine	36	distal gut	Host-associated	Animal	Animal distal gut			
+Luffariella variabilis	10	sponge	Host-associated	Animal	Animal corpus			
+Lumen	32	gut luminal content	Host-associated	Animal	Animal distal gut			
+lumen content	393	gut luminal content	Host-associated	Animal	Animal distal gut			
+luminal content	36	gut luminal content	Host-associated	Animal	Animal distal gut			
+luminal content feature	12	gut luminal content	Host-associated	Animal	Animal distal gut			
+lung tissue	90	body tissue	Host-associated	Animal	Animal corpus			
+lymph	1	bodily fluid	Host-associated	Animal	Animal corpus			
+marine sediment	564	sediment	Free-living	Saline	Sediment (saline)			
+marine sediment metagenome	1	sediment	Free-living	Saline	Sediment (saline)			
+meconium	7	meconium	Host-associated	Animal	Animal distal gut			
+mesenteric lymph node	2	body tissue	Host-associated	Animal	Animal corpus			
+mesentery	3	body tissue	Host-associated	Animal	Animal corpus			
+microbialite	18	sediment	Free-living	Non-saline	Surface (non-saline)			
+microbial mat	448	microbial mat	Free-living	Non-saline	Surface (non-saline)			
+mock community	52	mock community	Control	Positive	Mock community			
+mosquito tissue	2252	insect	Host-associated	Animal	Animal corpus			
+mouse vagina lavage		mouse vagina lavage	Host-associated	Animal	Animal secretion			
+mouth	6	oral	Host-associated	Animal	Animal corpus			
+Mouth	1054	oral	Host-associated	Animal	Animal secretion			
+mucosa	535	body tissue	Host-associated	Animal	Animal secretion			
+mucosa of descending colon	14	colon mucosa	Host-associated	Animal	Animal distal gut			
+mucosa of stomach	96	gastric mucosa	Host-associated	Animal	Animal proximal gut			
+mucus	771	mucus	Host-associated	Animal	Animal secretion			
+Mucus	4	mucus	Host-associated	Animal	Animal secretion			
+mung bean surface	8	food product	Host-associated	Plant	Plant surface			
+mushrooms surface	16	food product	Host-associated	Fungus	Fungus surface			
+must	279	must	Host-associated	Plant	Plant corpus			
+Mycale lingua	6	sponge	Host-associated	Animal	Animal corpus			
+Myxilla sp.	6	sponge	Host-associated	Animal	Animal corpus			
+nasal mucus	235	nasal mucus	Host-associated	Animal	Animal secretion			
+NEG	9	control blank	Control	Negative	Sterile water blank			
+Negative Control	7	control blank	Control	Negative	Sterile water blank			
+negativePCR	10	control blank	Control	Negative	Sterile water blank			
+nest of egg	407	nest of egg	Free-living	Non-saline	Surface (non-saline)			
+non-lithifying microbial mat	3	microbial mat	Free-living	Non-saline	Surface (non-saline)			
+Nose	606	skin	Host-associated	Animal	Animal surface			
+nose		skin	Host-associated	Animal	Animal surface			
+not applicable	258	undefined sample type	Unknown	Missing	Unknown (missing)			
+ocean water	59	sea water	Host-associated	Saline	Water (saline)			
+oil contaminated soil	46	soil	Free-living	Non-saline	Soil (non-saline)			
+olivine colonization experiment	8	water	Free-living	Non-saline	Surface (non-saline)			
+oral	169	oral	Host-associated	Animal	Animal secretion			
+Oral	2508	oral	Host-associated	Animal	Animal secretion			
+Orange icing sponge	5	sponge	Host-associated	Animal	Animal corpus			
+out_mouth	80	oral	Host-associated	Animal	Animal secretion			
+pancreas	1	pancreas	Host-associated	Animal	Animal corpus			
+Paramyxilla sp.	4	sponge	Host-associated	Animal	Animal corpus			
+Paratetilla sp (1)	6	sponge	Host-associated	Animal	Animal corpus			
+peach surface	20	food product	Host-associated	Plant	Plant surface			
+peat	216	plant	Host-associated	Plant	Plant surface			
+pellet	72	stool	Host-associated	Animal	Animal distal gut			
+peppers surface	24	food product	Host-associated	Plant	Plant surface			
+Personal Cell Phone	257	surface	Free-living	Non-saline	Surface (non-saline)			
+petroleum contaminated sediment	106	sediment	Free-living	Saline	Sediment (saline)			
+Petrosia ficiformis	6	sponge	Host-associated	Animal	Animal corpus			
+Phakellia ventilabrum	6	sponge	Host-associated	Animal	Animal corpus			
+Phorbas fictitius	24	sponge	Host-associated	Animal	Animal corpus			
+photosynthetic mat		photosynthetic mat	Free-living	Non-saline	Surface (non-saline)			
+Phyllospongia sp.	12	sponge	Host-associated	Animal	Animal corpus			
+piece of rock	1	rock	Free-living	Non-saline	Surface (non-saline)			
+Placospongia intermedia	1	sponge	Host-associated	Animal	Animal corpus			
+Plakina trilopha	6	sponge	Host-associated	Animal	Animal corpus			
+plankton	3	plankton	Host-associated	Animal	Animal corpus			
+plant	107	plant	Host-associated	Plant	Plant corpus			
+Plant surface	12	plant	Host-associated	Plant	Plant surface			
+plasma		plasma	Host-associated	Animal	Animal secretion			
+pleural	20	bodily fluid	Host-associated	Animal	Animal corpus			
+plumage	65	plumage	Host-associated	Animal	Animal corpus			
+Polymastia sp.	6	sponge	Host-associated	Animal	Animal corpus			
+proximal loop ileostomy	1	body tissue	Host-associated	Animal	Animal proximal gut			
+Pseudoceratina crassa	4	sponge	Host-associated	Animal	Animal corpus			
+Pseudoceratina sp.	6	sponge	Host-associated	Animal	Animal corpus			
+Pseudocorticium jarrei	6	sponge	Host-associated	Animal	Animal corpus			
+raw milk silo milk	57	milk	Host-associated	Animal	Animal secretion			
+reactor	183	reactor sludge	Host-associated	Animal-associated	Animal distal gut			
+Rectal fistula	1	body tissue	Host-associated	Animal	Animal distal gut			
+Rectal_Swab	124	anal swab	Host-associated	Animal	Animal distal gut			
+rectum	11	rectum	Host-associated	Animal	Animal distal gut			
+Reef Sediment		reef sediment	Free-living	Saline	Sediment (saline)			
+Repeats	23	undefined sample type	Unknown	Missing	Unknown (missing)			
+Rhabdastrella globostellata	6	sponge	Host-associated	Animal	Animal corpus			
+rhizome	46	rhizosphere	Host-associated	Plant	Plant rhizosphere			
+rhizosphere	399	rhizosphere	Host-associated	Plant	Plant rhizosphere			
+Rhizosphere	78	rhizosphere	Host-associated	Plant	Plant rhizosphere			
+Rhoaploeides odorabile	2	sponge	Host-associated	Animal	Animal corpus			
+Rhopaloeides odorabile	72	sponge	Host-associated	Animal	Animal corpus			
+Right Hand	278	skin	Host-associated	Animal	Animal surface			
+Right leg	2	skin	Host-associated	Animal	Animal surface			
+right palm	10	skin	Host-associated	Animal	Animal surface			
+rocky sand	119	soil	Free-living	Non-saline	Soil (non-saline)			
+Root	9	plant	Host-associated	Plant	Plant rhizosphere			
+roots	153	plant	Host-associated	Plant	Plant rhizosphere			
+Roots	16	plant	Host-associated	Plant	Plant rhizosphere			
+row pore rope sponge	4	sponge	Host-associated	Animal	Animal corpus			
+royal jelly	3	insect	Host-associated	Animal	Animal secretion			
+saline biofilm	20	saline biofilm	Free-living	Saline	Surface (saline)			
+saline lake sediment	8	saline lake sediment	Free-living	Saline	Sediment (saline)			
+saline water	5	saline water	Free-living	Saline	Water (saline)			
+saliva	4281	saliva	Host-associated	Animal	Animal secretion			
+Saliva	348	saliva	Host-associated	Animal	Animal secretion			
+scattered pore rope sponge	4	sponge	Host-associated	Animal	Animal corpus			
+sea grass	3	plant	Host-associated	Plant	Plant corpus			
+sea_lettuce	1	plant	Host-associated	Plant	Plant corpus			
+seawater	977	sea water	Free-living	Saline	Water (saline)			
+sea water	598	sea water	Free-living	Saline	Water (saline)			
+sea water	99	sea water	Free-living	Saline	Water (saline)			
+Seawater	74	sea water	Free-living	Saline	Water (saline)			
+seawater mesocosm	268	seawater mesocosm	Free-living	Saline	Water (saline)			
+sebum	2318	skin	Host-associated	Animal	Animal secretion			
+sediment	160	sediment	Free-living	Non-saline	Sediment (non-saline)			
+separator cream	12	milk	Free-living	Animal	Animal secretion			
+separator feed milk	20	milk	Free-living	Animal	Animal secretion			
+separator skim milk	12	milk	Free-living	Animal	Animal secretion			
+Shirt Hem	270	surface	Free-living	Non-saline	Surface (non-saline)			
+Shoe	226	surface	Free-living	Non-saline	Surface (non-saline)			
+sigmoid colon hartmann	1	body tissue	Host-associated	Animal	Animal distal gut			
+Sink floor	12	surface	Free-living	Non-saline	Surface (non-saline)			
+siphon tissue	1	body tissue	Host-associated	Animal	Animal corpus			
+skim milk	8	milk	Host-associated	Animal	Animal secretion			
+skin	7199	skin	Host-associated	Animal	Animal surface			
+Skin	1664	skin	Host-associated	Animal	Animal surface			
+skin areola		skin areola	Host-associated	Animal	Animal surface			
+skin mucus	64	skin	Host-associated	Animal	Animal surface			
+small intestine mucosa	1	small intestine mucosa	Host-associated	Animal	Animal proximal gut			
+Soap dispenser	12	surface	Free-living	Non-saline	Surface (non-saline)			
+soil	5516	soil	Free-living	Non-saline	Soil (non-saline)			
+Soil	2054	soil	Free-living	Non-saline	Soil (non-saline)			
+Soil (non-saline)	8	soil	Free-living	Non-saline	Soil (non-saline)			
+soil oil contaminated	3	soil	Free-living	Non-saline	Soil (non-saline)			
+Spheciospongia vagabunda	5	sponge	Host-associated	Animal	Animal corpus			
+spinach surface	23	food product	Host-associated	Plant	Plant surface			
+sponges	709	sponge	Host-associated	Animal	Animal corpus			
+sponge tissue	6057	sponge	Host-associated	Animal	Animal corpus			
+Sponge Tissue	50	sponge	Host-associated	Animal	Animal corpus			
+Spongia	6	sponge	Host-associated	Animal	Animal corpus			
+sputum		sputum	Host-associated	Animal	Animal secretion			
+Stall in	12	surface	Free-living	Non-saline	Surface (non-saline)			
+Stall out	12	surface	Free-living	Non-saline	Surface (non-saline)			
+Station Phone	105	surface	Free-living	Non-saline	Surface (non-saline)			
+Stelletta aremaria	6	sponge	Host-associated	Animal	Animal corpus			
+Stelletta maori	6	sponge	Host-associated	Animal	Animal corpus			
+sterile water	132	control blank	Control	Negative	Sterile water blank			
+stomach mucosa		stomach mucosa	Host-associated	Animal	Animal proximal gut			
+stool	19926	stool	Host-associated	Animal	Animal distal gut			
+Stool	15851	stool	Host-associated	Animal	Animal distal gut			
+Stool_Stabilizer	806	stool	Host-associated	Animal	Animal distal gut			
+strawberries surface	24	food product	Host-associated	Plant	Plant surface			
+Strawberry vase sponge	5	sponge	Host-associated	Plant	Animal corpus			
+Stylissa carteri	10	sponge	Host-associated	Animal	Animal corpus			
+Stylissa massa	18	sponge	Host-associated	Animal	Animal corpus			
+Stylissa sp.	8	sponge	Host-associated	Animal	Animal corpus			
+Suberites diversicolour	15	sponge	Host-associated	Animal	Animal corpus			
+subgingival dental plaque	391	oral	Host-associated	Animal	Animal corpus			
+supragingival dental plaque	388	oral	Host-associated	Animal	Animal corpus			
+surface	85	surface	Free-living	Non-saline	Surface (non-saline)			
+Surface (non-saline)	25	surface	Free-living	Non-saline	Surface (non-saline)			
+surface soil	12	soil	Free-living	Non-saline	Soil (non-saline)			
+surface_touched		surface	Free-living	Non-saline	Surface (non-saline)			
+swab	32	control swab	Control	Negative	Sterile water blank			
+Swab	14	control swab	Control	Negative	Sterile water blank			
+Swabblank	40	control swab	Control	Negative	Sterile water blank			
+tanker milk	1073	milk	Host-associated	Animal	Animal secretion			
+Tears	47	tears	Host-associated	Animal	Animal secretion			
+test		test	Unknown	Missing	Unknown (missing)			
+Theonella swinhoei	6	sponge	Host-associated	Animal	Animal corpus			
+tissue from tick	120	insect	Host-associated	Animal	Animal corpus			
+Toilet Floor	12	surface	Free-living	Non-saline	Surface (non-saline)			
+Toilet flush handle	12	surface	Free-living	Non-saline	Surface (non-saline)			
+Toilet seat	12	surface	Free-living	Non-saline	Surface (non-saline)			
+tomato surface	24	food product	Host-associated	Plant	Plant surface			
+tongue		tongue	Free-living	Animal	Animal secretion			
+tooth		tooth	Free-living	Animal	Animal corpus			
+Torso	92	skin	Host-associated	Animal	Animal surface			
+triatomine feces	32	stool	Host-associated	Animal	Animal distal gut			
+UF conc post chill milk	20	milk	Free-living	Animal	Animal secretion			
+UF conc silo milk	32	milk	Free-living	Animal	Animal secretion			
+UF conc tank milk	28	milk	Free-living	Animal	Animal secretion			
+UF feed tank milk	36	milk	Free-living	Animal	Animal secretion			
+underground water	124	underground water	Free-living	Non-saline	Water (non-saline)			
+unknown	191	undefined sample type	Unknown	Missing	Unknown (missing)			
+undefined reference sample		undefined reference sample	Unknown	Missing	Unknown (missing)			
+Upper intestine	36	proximal gut content	Host-associated	Animal	Animal proximal gut			
+urine		urine	Host-associated	Animal	Animal secretion			
+vaginal	297	vaginal mucus	Host-associated	Animal	Animal corpus			
+Vaginal	300	vaginal mucus	Host-associated	Animal	Animal corpus			
+vaginal mucus	47	vaginal mucus	Host-associated	Animal	Animal secretion			
+Vaginal mucus	39	vaginal mucus	Host-associated	Animal	Animal secretion			
+Vaginal_Swab	123	vaginal mucus	Host-associated	Animal	Animal secretion			
+water	243	water	Free-living	Non-saline	Water (non-saline)			
+Water	7	water	Free-living	Non-saline	Water (non-saline)			
+water filter	14	water	Free-living	Non-saline	Surface (non-saline)			
+Water filter	5	water	Free-living	Non-saline	Surface (non-saline)			
+Water (non-saline)	4	water	Free-living	Non-saline	Water (non-saline)			
+wetland soil	192	wetland soil	Free-living	Non-saline	Soil (non-saline)			
+whole ant larvae	93	insect	Host-associated	Animal	Animal corpus			
+whole insect	51	insect	Host-associated	Animal	Animal corpus			
+Whole Coral		coral	Host-associated	Animal	Animal corpus			
+whole mice lung	15	body tissue	Host-associated	Animal	Animal corpus			
+wine	525	fermented food product	Free-living	Non-saline	Surface (non-saline)			
+Xestospongia aff. carbonaria	6	sponge	Host-associated	Animal	Animal corpus			
+Xestospongia bocatorensis	5	sponge	Host-associated	Animal	Animal corpus			
+Xestospongia exigua	4	sponge	Host-associated	Animal	Animal corpus			
+Xestospongia muta	6	sponge	Host-associated	Animal	Animal corpus			
+Xestospongia sp.	12	sponge	Host-associated	Animal	Animal corpus			
+Xestospongia testudinaria	24	sponge	Host-associated	Animal	Animal corpus			
